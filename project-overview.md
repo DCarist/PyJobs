@@ -30,10 +30,20 @@ graph TD
    * `POST /search`: Triggers `fetch_jobs()`, deduplicates against existing records via `job_id`, inserts newly found jobs, and returns `job_results.html`.
    * `GET /job/{id}` & `DELETE /job/{id}`: View details or remove job cards from the UI via HTMX DOM replacement.
 2. **Data Models (`models.py`)**:
-   * `UserPreference`: Stores target position keywords, location, and industry fields.
+   * `UserPreference`: Stores target position keywords, location, industry fields, active job board selections (`sites`), and remote preference flag (`is_remote`).
    * `SavedJob`: Stores scraped metadata (title, company, salary source, posting date, original URL, description).
-3. **Database Connection (`database.py`)**:
-   * Standard SQLite connection with thread checking disabled for FastAPI compatibility.
+3. **Database Connection & Migration (`database.py`)**:
+   * SQLite connection with thread checking disabled for FastAPI compatibility.
+   * `init_db()` automatically provisions tables and applies column migrations for existing SQLite databases.
+4. **Scraping Engine & Location Intelligence (`scraper.py`)**:
+   * `parse_locations()` parses flexible input formats (single city, City/State, multi-city semicolon/comma lists, remote keywords).
+   * Aggregates postings across selected boards with cross-batch deduplication by `job_id` and composite key.
+   * **Job Board Landscape & Anti-Bot Protection**:
+     * **LinkedIn**: Fast, highly reliable, rich job details (active by default).
+     * **Indeed**: High volume; requires `country_indeed="usa"` (active by default).
+     * **Google Jobs**: Aggregated company sites and job postings (active by default).
+     * **ZipRecruiter**: API protected by Cloudflare WAF (`403 forbidden aa`); requires residential proxies.
+     * **Glassdoor**: Protected by Cloudflare bot management (`400 location not parsed` / `403`); requires residential proxies.
 
 ---
 

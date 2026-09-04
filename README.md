@@ -38,6 +38,31 @@ Navigate to `http://localhost:8000` in your browser.
 
 ---
 
+## Job Board Scraping & Location Syntax
+
+### Supported Job Boards & Anti-Bot Protections
+* **LinkedIn (`linkedin`)**: Highly reliable, returns rich job postings, titles, and companies rapidly. *(Active by default)*
+* **Indeed (`indeed`)**: High volume, comprehensive coverage. Requires `country_indeed="usa"`. *(Active by default)*
+* **Google Jobs (`google`)**: Aggregates postings from direct employer sites and job boards. *(Active by default)*
+* **ZipRecruiter (`zip_recruiter`)**: Uses mobile API endpoints protected by Cloudflare WAF (`403 forbidden aa`). Deselected by default; requires residential proxies.
+* **Glassdoor (`glassdoor`)**: Location lookup and GraphQL endpoints are protected by Cloudflare bot management (`400 location not parsed` / `403`). Deselected by default; requires residential proxies.
+
+### Multi-Location & Remote Syntax
+The Location input supports flexible, multi-target parsing:
+* **Single City**: `Philadelphia`
+* **City & State**: `Philadelphia, PA`
+* **Multiple Cities**: `Philadelphia, PA; New York, NY` or `Philadelphia, PA, Boston, MA`
+* **Remote Keywords**: `Philadelphia, PA, Remote` or `Remote` (or check the *Include Remote* box).
+
+### Optional Proxy Configuration
+To route scraper requests (especially for ZipRecruiter and Glassdoor) through proxy pools, set the `JOBSPY_PROXIES` environment variable:
+```bash
+# Comma-separated list or single proxy URL
+set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
+```
+
+---
+
 ## Code Quality & Verification Gates
 
 All code changes must pass the automated quality checks before merging back to `main`:
