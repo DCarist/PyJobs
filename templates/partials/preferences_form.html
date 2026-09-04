@@ -1,17 +1,29 @@
 <form hx-post="/preferences" hx-target="#preferences-container">
   <div class="form-group">
-    <label for="location">Location</label>
+    <label for="location">Location(s)</label>
     <input
       type="text"
       id="location"
       name="location"
       value="{{ pref.location if pref else '' }}"
-      placeholder="e.g. Dallas, TX"
+      placeholder="e.g. Philadelphia, PA or Dallas, TX; Austin, TX"
     >
     <small
       style="color: var(--text-secondary); font-size: 0.8rem; display: block; margin-top: 0.25rem;"
-      >Searches within a 50-mile radius by default.</small
+      >Supports single cities, state pairs, or multiple locations separated by
+      commas/semicolons.</small
     >
+  </div>
+
+  <div class="form-group">
+    <label class="checkbox-label" for="is_remote">
+      {% if pref and pref.is_remote %}
+      <input type="checkbox" id="is_remote" name="is_remote" value="true" checked>
+      {% else %}
+      <input type="checkbox" id="is_remote" name="is_remote" value="true">
+      {% endif %}
+      <span>Include Remote / Telecommute Postings</span>
+    </label>
   </div>
 
   <div class="form-group">
@@ -21,7 +33,7 @@
       id="positions"
       name="positions"
       value="{{ pref.positions if pref else '' }}"
-      placeholder="e.g. Software Engineer"
+      placeholder="e.g. Quality Assurance"
     >
   </div>
 
@@ -32,8 +44,68 @@
       id="fields"
       name="fields"
       value="{{ pref.fields if pref else '' }}"
-      placeholder="e.g. Python, Remote"
+      placeholder="e.g. Six Sigma, Automation"
     >
+  </div>
+
+  <div class="form-group">
+    <span class="label-heading">Job Boards to Scrape</span>
+    <div class="checkbox-group">
+      {% set active_sites = (pref.sites.split(',') if pref and pref.sites else ['linkedin',
+      'indeed', 'google']) %}
+
+      <label class="checkbox-label" for="site_linkedin">
+        {% if 'linkedin' in active_sites %}
+        <input type="checkbox" id="site_linkedin" name="sites" value="linkedin" checked>
+        {% else %}
+        <input type="checkbox" id="site_linkedin" name="sites" value="linkedin">
+        {% endif %}
+        <span>LinkedIn <span class="checkbox-note">(Fast, highly reliable)</span></span>
+      </label>
+
+      <label class="checkbox-label" for="site_indeed">
+        {% if 'indeed' in active_sites %}
+        <input type="checkbox" id="site_indeed" name="sites" value="indeed" checked>
+        {% else %}
+        <input type="checkbox" id="site_indeed" name="sites" value="indeed">
+        {% endif %}
+        <span>Indeed <span class="checkbox-note">(Comprehensive, high volume)</span></span>
+      </label>
+
+      <label class="checkbox-label" for="site_google">
+        {% if 'google' in active_sites %}
+        <input type="checkbox" id="site_google" name="sites" value="google" checked>
+        {% else %}
+        <input type="checkbox" id="site_google" name="sites" value="google">
+        {% endif %}
+        <span
+          >Google Jobs <span class="checkbox-note">(Aggregated across company sites)</span></span
+        >
+      </label>
+
+      <label class="checkbox-label" for="site_zip">
+        {% if 'zip_recruiter' in active_sites %}
+        <input type="checkbox" id="site_zip" name="sites" value="zip_recruiter" checked>
+        {% else %}
+        <input type="checkbox" id="site_zip" name="sites" value="zip_recruiter">
+        {% endif %}
+        <span
+          >ZipRecruiter
+          <span class="checkbox-note">(Subject to Cloudflare WAF bot blocks)</span></span
+        >
+      </label>
+
+      <label class="checkbox-label" for="site_glassdoor">
+        {% if 'glassdoor' in active_sites %}
+        <input type="checkbox" id="site_glassdoor" name="sites" value="glassdoor" checked>
+        {% else %}
+        <input type="checkbox" id="site_glassdoor" name="sites" value="glassdoor">
+        {% endif %}
+        <span
+          >Glassdoor <span class="checkbox-note">(Subject to Cloudflare WAF bot blocks)</span></span
+        >
+      </label>
+    </div>
   </div>
 
   <button type="submit" class="btn-secondary">Save Preferences</button>

@@ -28,6 +28,27 @@ def test_save_preferences(client, db_session):
     assert pref.positions == "Backend Engineer"
 
 
+def test_save_preferences_with_sites_and_remote(client, db_session):
+    response = client.post(
+        "/preferences",
+        data={
+            "location": "Philadelphia, PA, Remote",
+            "positions": "Quality Assurance",
+            "fields": "Six Sigma",
+            "sites": ["linkedin", "indeed"],
+            "is_remote": "true",
+        },
+    )
+    assert response.status_code == 200
+    assert "Preferences saved successfully!" in response.text
+
+    pref = db_session.query(UserPreference).first()
+    assert pref is not None
+    assert pref.location == "Philadelphia, PA, Remote"
+    assert pref.is_remote is True
+    assert "linkedin" in pref.sites
+
+
 def test_search_jobs_missing_preferences(client):
     response = client.post("/search")
     assert response.status_code == 200

@@ -8,12 +8,12 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from database import Base, SessionLocal, engine
+from database import SessionLocal, init_db
 from models import SavedJob, UserPreference
 from scraper import fetch_jobs
 
-# Create DB tables
-Base.metadata.create_all(bind=engine)
+# Create DB tables and apply column additions
+init_db()
 
 app = FastAPI(title="PyJobs")
 
@@ -47,16 +47,27 @@ async def save_preferences(
     location: str = Form(""),
     positions: str = Form(""),
     fields: str = Form(""),
+    sites: list[str] = Form(default=[]),
+    is_remote: bool = Form(default=False),
     db: Session = Depends(get_db),
 ):
     pref = db.query(UserPreference).first()
+    sites_str = ",".join(sites) if sites else "linkedin,indeed,google"
     if not pref:
-        pref = UserPreference(location=location, positions=positions, fields=fields)
+        pref = UserPreference(
+            location=location,
+            positions=positions,
+            fields=fields,
+            sites=sites_str,
+            is_remote=is_remote,
+        )
         db.add(pref)
     else:
         pref.location = location
         pref.positions = positions
         pref.fields = fields
+        pref.sites = sites_str
+        pref.is_remote = is_remote
     db.commit()
 
     # Return just the form to update it without full reload
@@ -70,7 +81,7 @@ async def save_preferences(
 @app.post("/search", response_class=HTMLResponse)
 async def search_jobs(request: Request, db: Session = Depends(get_db)):
     pref = db.query(UserPreference).first()
-    if not pref or not pref.positions or not pref.location:
+    if not pref or not pref.positions or (not pref.location and not pref.is_remote):
         return HTMLResponse(
             "<div class='error-msg'>"
             "Please set and save your position and location preferences first."
@@ -81,8 +92,19 @@ async def search_jobs(request: Request, db: Session = Depends(get_db)):
     if pref.fields:
         search_term += f" {pref.fields}"
 
+    sites_list = (
+        [s.strip() for s in pref.sites.split(",") if s.strip()]
+        if pref.sites
+        else ["linkedin", "indeed", "google"]
+    )
+
     fetched_jobs = fetch_jobs(
-        search_term=search_term, location=pref.location, distance_miles=50, results_wanted=20
+        search_term=search_term,
+        location=pref.location,
+        distance_miles=50,
+        results_wanted=25,
+        sites=sites_list,
+        is_remote=pref.is_remote,
     )
 
     saved_jobs_list = []

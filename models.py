@@ -1,6 +1,6 @@
 import datetime
 
-from sqlalchemy import DateTime, String
+from sqlalchemy import Boolean, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database import Base
@@ -13,6 +13,8 @@ class UserPreference(Base):
     location: Mapped[str] = mapped_column(String, default="")
     positions: Mapped[str] = mapped_column(String, default="")  # comma separated
     fields: Mapped[str] = mapped_column(String, default="")  # comma separated
+    sites: Mapped[str] = mapped_column(String, default="linkedin,indeed,google")
+    is_remote: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class SavedJob(Base):

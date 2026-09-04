@@ -74,7 +74,8 @@ h1 {
   margin-bottom: 1.5rem;
 }
 
-label {
+label,
+.label-heading {
   display: block;
   margin-bottom: 0.5rem;
   color: var(--text-secondary);
@@ -136,6 +137,33 @@ input:focus {
 
 .btn-secondary:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+.checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: auto;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+.checkbox-note {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
 }
 
 .job-card {
