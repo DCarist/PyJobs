@@ -1,35 +1,230 @@
 {% extends "base.html" %} {% block content %}
 <div class="grid">
-  <!-- Left Column: Preferences -->
-  <div class="glass-panel" style="padding: 1.5rem; height: fit-content;">
-    <h2 style="margin-top: 0;">Search Preferences</h2>
-    <div id="preferences-container">{% include "partials/preferences_form.html" %}</div>
-  </div>
-
-  <!-- Right Column: Results & Search Action -->
-  <div class="glass-panel" style="padding: 1.5rem;">
+  <!-- Left Column: Search Preferences -->
+  <aside class="glass-panel" style="padding: 1.5rem; height: fit-content;">
     <div
-      style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;"
+      style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;"
     >
-      <h2 style="margin: 0;">Curated Jobs</h2>
-      <button
-        type="button"
-        class="btn-primary"
-        hx-post="/search"
-        hx-target="#job-results"
-        hx-indicator="#search-loader"
-        style="width: auto;"
-      >
-        <span class="btn-text">Find Jobs</span>
-        <div class="loader" id="search-loader"></div>
-      </button>
+      <h2 style="margin: 0; font-size: 1.25rem;">Search Preferences</h2>
+    </div>
+    <div id="preferences-container">{% include "partials/preferences_form.html" %}</div>
+  </aside>
+
+  <!-- Right Column: Local Curation Workspace & Live Scraping Action -->
+  <section class="glass-panel" style="padding: 1.5rem;">
+    <!-- Top Action Header: Live Scrape vs Local Workspace -->
+    <div class="curation-header">
+      <div>
+        <h2 style="margin: 0 0 0.25rem 0;">Curated Postings</h2>
+        <p class="section-subtitle" style="margin: 0;">
+          Explore and filter your saved jobs locally at zero latency.
+        </p>
+      </div>
+
+      <!-- Explicit External Live Web Scraper Trigger -->
+      <div style="text-align: right;">
+        <button
+          type="button"
+          class="btn-primary"
+          hx-post="/search"
+          hx-target="#job-results"
+          hx-indicator="#search-loader"
+          style="width: auto; padding: 0.65rem 1.25rem;"
+          title="Queries external job boards (LinkedIn, Indeed, Google) to import newly posted jobs into your local database"
+        >
+          <span class="btn-text">🌐 Run Live Web Scrape</span>
+          <div class="loader" id="search-loader"></div>
+        </button>
+        <span
+          class="scrape-hint"
+          style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.35rem;"
+        >
+          Pulls fresh postings from the web
+        </span>
+      </div>
     </div>
 
-    <div id="job-results">
-      <p style="color: var(--text-secondary); text-align: center; padding: 2rem 0;">
-        Click "Find Jobs" to start scraping across multiple sites.
-      </p>
+    <!-- Curation Toolbar: Fast Local Database Filtering, Sorting & Grouping -->
+    <div class="curation-toolbar glass-panel">
+      <form
+        id="curation-form"
+        hx-get="/jobs/filter"
+        hx-target="#job-results"
+        hx-push-url="true"
+        hx-trigger="change"
+      >
+        <!-- Search Input Row -->
+        <div class="search-row">
+          <input
+            type="text"
+            name="q"
+            id="curation-search"
+            class="search-input"
+            placeholder="Instant search by title, company, or keyword..."
+            hx-get="/jobs/filter"
+            hx-target="#job-results"
+            hx-include="#curation-form"
+            hx-trigger="input changed delay:250ms, search"
+            hx-push-url="true"
+          >
+        </div>
+
+        <!-- Controls Grid -->
+        <div class="controls-grid">
+          <!-- Sort Selector -->
+          <div class="control-item">
+            <label for="sort-select">Sort By</label>
+            <select name="sort" id="sort-select">
+              <option value="newest">Date (Newest First)</option>
+              <option value="oldest">Date (Oldest First)</option>
+              <option value="salary_desc">Salary (Highest First)</option>
+              <option value="salary_asc">Salary (Lowest First)</option>
+              <option value="company">Company (A to Z)</option>
+              <option value="title">Title (A to Z)</option>
+            </select>
+          </div>
+
+          <!-- Grouping Selector -->
+          <div class="control-item">
+            <label for="group-select">Group View</label>
+            <select name="group_by" id="group-select">
+              <option value="none">Flat Feed (No Grouping)</option>
+              <option value="company">Group by Company</option>
+              <option value="location">Group by Location</option>
+              <option value="seniority">Group by Seniority Level</option>
+              <option value="salary_bracket">Group by Salary Bracket</option>
+              <option value="date_posted">Group by Date Posted</option>
+            </select>
+          </div>
+
+          <!-- Seniority Level Filter -->
+          <div class="control-item">
+            <label for="seniority-select">Seniority Level</label>
+            <select name="seniority" id="seniority-select">
+              <option value="all">All Seniority Levels</option>
+              <option value="Executive / VP">Executive / VP</option>
+              <option value="Director">Director</option>
+              <option value="Manager">Manager</option>
+              <option value="Supervisor / Lead">Supervisor / Lead</option>
+              <option value="Senior / Principal">Senior / Principal</option>
+              <option value="Specialist / Contributor">Specialist / Contributor</option>
+            </select>
+          </div>
+
+          <!-- Salary Bracket Filter -->
+          <div class="control-item">
+            <label for="salary-select">Salary Bracket</label>
+            <select name="salary_bracket" id="salary-select">
+              <option value="all">All Salary Brackets</option>
+              <option value="< $80k">&lt; $80k</option>
+              <option value="$80k - $120k">$80k - $120k</option>
+              <option value="$120k - $160k">$120k - $160k</option>
+              <option value="$160k - $200k">$160k - $200k</option>
+              <option value="$200k+">$200k+</option>
+              <option value="Unspecified">Unspecified Salary Only</option>
+            </select>
+          </div>
+
+          <!-- Job Board Filter -->
+          <div class="control-item">
+            <label for="site-select">Source Board</label>
+            <select name="site" id="site-select">
+              <option value="all">All Boards</option>
+              <option value="linkedin">LinkedIn</option>
+              <option value="indeed">Indeed</option>
+              <option value="google">Google Jobs</option>
+              <option value="zip_recruiter">ZipRecruiter</option>
+              <option value="glassdoor">Glassdoor</option>
+            </select>
+          </div>
+
+          <!-- Date Posted Filter -->
+          <div class="control-item">
+            <label for="date-select">Date Posted</label>
+            <select name="date_range" id="date-select">
+              <option value="all">Any Time</option>
+              <option value="24h">Past 24 Hours</option>
+              <option value="3d">Past 3 Days</option>
+              <option value="7d">Past Week</option>
+              <option value="14d">Past 2 Weeks</option>
+              <option value="30d">Past Month</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Toggles & Export Toolbar Row -->
+        <div class="toolbar-bottom-row">
+          <div class="toggles-group">
+            <label class="checkbox-label" for="include_unspecified">
+              <input
+                type="checkbox"
+                id="include_unspecified"
+                name="include_unspecified"
+                value="true"
+                checked
+              >
+              <span>Include unspecified salaries</span>
+            </label>
+
+            <label class="checkbox-label" for="show_hidden">
+              <input type="checkbox" id="show_hidden" name="show_hidden" value="true">
+              <span>View hidden postings</span>
+            </label>
+          </div>
+
+          <!-- Export Action Buttons -->
+          <div class="export-actions">
+            <span class="export-label">Export:</span>
+            <button
+              type="button"
+              class="btn-secondary btn-small"
+              onclick="exportJobs('csv')"
+              title="Export currently filtered jobs to CSV"
+            >
+              CSV
+            </button>
+            <button
+              type="button"
+              class="btn-secondary btn-small"
+              onclick="exportJobs('xlsx')"
+              title="Export currently filtered jobs to Excel (.xlsx)"
+            >
+              Excel
+            </button>
+            <button
+              type="button"
+              class="btn-secondary btn-small"
+              onclick="exportJobs('json')"
+              title="Export currently filtered jobs to JSON"
+            >
+              JSON
+            </button>
+            <button
+              type="button"
+              class="btn-secondary btn-small"
+              onclick="document.getElementById('curation-form').reset(); htmx.trigger('#curation-search', 'input');"
+              title="Reset all filters to default"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      </form>
     </div>
-  </div>
+
+    <!-- Active Job Results Feed (Pre-populated with saved SQLite jobs on load) -->
+    <div id="job-results" style="margin-top: 1.5rem;">
+      {% include "partials/job_results.html" %}
+    </div>
+  </section>
 </div>
+
+<script>
+window.exportJobs = (format) => {
+  const form = document.getElementById("curation-form");
+  const params = new URLSearchParams(new FormData(form));
+  params.set("format", format);
+  window.location.href = `/jobs/export?${params.toString()}`;
+};
+</script>
 {% endblock %}

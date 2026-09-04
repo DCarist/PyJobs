@@ -1,13 +1,112 @@
-{% if jobs %} {% for job in jobs %}
+{% if grouped_jobs and group_by != "none" %} {% for group_name, group_list in grouped_jobs.items()
+%}
+<details class="group-section glass-panel" open>
+  <summary class="group-summary">
+    <div class="group-header-left">
+      <span class="group-chevron">▼</span>
+      <span class="group-title">{{ group_name }}</span>
+    </div>
+    <span class="badge group-count">{{ group_list|length }} postings</span>
+  </summary>
+  <div class="group-content">
+    {% for job in group_list %}
+    <div class="job-card glass-panel" id="job-{{ job.id }}">
+      <div class="job-header">
+        <div>
+          <h3 class="job-title">{{ job.title }}</h3>
+          <p class="job-company">{{ job.company }}</p>
+        </div>
+        <div class="badges-top">
+          <span class="badge seniority-badge">{{ job.seniority_level }}</span>
+          {% if job.site %}
+          <span class="badge site-badge">{{ job.site|capitalize }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="job-meta">
+        {% if job.location %}
+        <span class="badge">
+          📍
+          <a
+            href="https://www.google.com/maps/search/?api=1&query={{ job.location|urlencode }}"
+            target="_blank"
+            class="external-link"
+            style="color: inherit;"
+            >{{ job.location }}</a
+          >
+        </span>
+        {% endif %} {% if job.salary_bracket and job.salary_bracket != 'Unspecified' %}
+        <span class="badge salary-badge">💰 {{ job.salary_bracket }}</span>
+        {% elif job.salary_source %}
+        <span class="badge salary-badge">💰 {{ job.salary_source }}</span>
+        {% endif %} {% if job.date_posted %}
+        <span class="badge">🕒 {{ job.date_posted.strftime('%b %d, %Y') }}</span>
+        {% endif %} {% if job.is_hidden %}
+        <span class="badge hidden-badge">Hidden</span>
+        {% endif %}
+      </div>
+
+      <div class="actions-bar">
+        {% if job.job_url %}
+        <a
+          href="{{ job.job_url }}"
+          target="_blank"
+          class="btn-primary btn-small"
+          style="text-decoration: none; text-align: center;"
+          >Apply Here</a
+        >
+        {% endif %}
+        <button
+          type="button"
+          class="btn-secondary btn-small"
+          hx-get="/job/{{ job.id }}"
+          hx-target="#job-details-{{ job.id }}"
+          hx-swap="innerHTML"
+        >
+          View Details
+        </button>
+        {% if job.is_hidden %}
+        <button
+          type="button"
+          class="btn-secondary btn-small"
+          hx-post="/job/{{ job.id }}/unhide"
+          hx-target="#job-{{ job.id }}"
+          hx-swap="outerHTML"
+        >
+          Unhide
+        </button>
+        {% else %}
+        <button
+          type="button"
+          class="btn-secondary btn-small"
+          hx-post="/job/{{ job.id }}/hide"
+          hx-target="#job-{{ job.id }}"
+          hx-swap="outerHTML"
+        >
+          Hide
+        </button>
+        {% endif %}
+      </div>
+
+      <div id="job-details-{{ job.id }}"></div>
+    </div>
+    {% endfor %}
+  </div>
+</details>
+{% endfor %} {% elif jobs %} {% for job in jobs %}
 <div class="job-card glass-panel" id="job-{{ job.id }}">
   <div class="job-header">
     <div>
       <h3 class="job-title">{{ job.title }}</h3>
       <p class="job-company">{{ job.company }}</p>
     </div>
-    {% if job.site %}
-    <span class="badge site-badge">{{ job.site|capitalize }}</span>
-    {% endif %}
+    <div class="badges-top">
+      <span class="badge seniority-badge">{{ job.seniority_level }}</span>
+      {% if job.site %}
+      <span class="badge site-badge">{{ job.site|capitalize }}</span>
+      {% endif %}
+    </div>
   </div>
 
   <div class="job-meta">
@@ -22,12 +121,14 @@
         >{{ job.location }}</a
       >
     </span>
-    {% endif %} {% if job.salary_source %}
-    <span class="badge">💰 {{ job.salary_source }}</span>
+    {% endif %} {% if job.salary_bracket and job.salary_bracket != 'Unspecified' %}
+    <span class="badge salary-badge">💰 {{ job.salary_bracket }}</span>
+    {% elif job.salary_source %}
+    <span class="badge salary-badge">💰 {{ job.salary_source }}</span>
     {% endif %} {% if job.date_posted %}
-    <span class="badge"
-      >🕒 {{ job.date_posted.strftime('%b %d, %Y') if job.date_posted else '' }}</span
-    >
+    <span class="badge">🕒 {{ job.date_posted.strftime('%b %d, %Y') }}</span>
+    {% endif %} {% if job.is_hidden %}
+    <span class="badge hidden-badge">Hidden</span>
     {% endif %}
   </div>
 
@@ -50,22 +151,37 @@
     >
       View Details
     </button>
+    {% if job.is_hidden %}
     <button
       type="button"
       class="btn-secondary btn-small"
-      hx-delete="/job/{{ job.id }}"
+      hx-post="/job/{{ job.id }}/unhide"
+      hx-target="#job-{{ job.id }}"
+      hx-swap="outerHTML"
+    >
+      Unhide
+    </button>
+    {% else %}
+    <button
+      type="button"
+      class="btn-secondary btn-small"
+      hx-post="/job/{{ job.id }}/hide"
       hx-target="#job-{{ job.id }}"
       hx-swap="outerHTML"
     >
       Hide
     </button>
+    {% endif %}
   </div>
 
-  <!-- Placeholder for expanded details -->
   <div id="job-details-{{ job.id }}"></div>
 </div>
 {% endfor %} {% else %}
-<div class="error-msg">
-  No jobs found for these criteria. Try adjusting your preferences or reducing keywords.
+<div class="error-msg" style="text-align: center; padding: 2rem;">
+  No jobs found matching your current filter criteria.
+  <div style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-secondary);">
+    Try clearing keyword filters, including unspecified salaries, or click "Run Live Web Scrape" to
+    discover new postings.
+  </div>
 </div>
 {% endif %}

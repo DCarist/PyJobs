@@ -64,25 +64,117 @@ US_STATES = {
 
 REMOTE_KEYWORDS = {"remote", "hybrid", "anywhere", "work from home", "wfh"}
 
+# Extensible Seniority Taxonomy Rules (Evaluated in priority order)
+SENIORITY_RULES: list[tuple[str, re.Pattern[str]]] = [
+    (
+        "Executive / VP",
+        re.compile(
+            r"\b(vp|vice president|chief|cto|cio|cso|cpo|ceo|c-level|head of)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "Director",
+        re.compile(r"\b(director|dir\.?)\b", re.IGNORECASE),
+    ),
+    (
+        "Manager",
+        re.compile(
+            r"\b(manager|mgr\.?|engineering manager|qa manager|product manager)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "Supervisor / Lead",
+        re.compile(
+            r"\b(supervisor|team lead|tech lead|leader|lead)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "Senior / Principal",
+        re.compile(
+            r"\b(senior|sr\.?|principal|staff|architect)\b",
+            re.IGNORECASE,
+        ),
+    ),
+]
+DEFAULT_SENIORITY = "Specialist / Contributor"
+
+
+def classify_seniority(title: str) -> str:
+    """Classifies a job title into an extensible seniority tier."""
+    if not title:
+        return DEFAULT_SENIORITY
+    for tier, pattern in SENIORITY_RULES:
+        if pattern.search(title):
+            return tier
+    return DEFAULT_SENIORITY
+
+
+SALARY_BRACKETS = [
+    "< $80k",
+    "$80k - $120k",
+    "$120k - $160k",
+    "$160k - $200k",
+    "$200k+",
+    "Unspecified",
+]
+
+
+def categorize_salary(
+    min_amount: float | None,
+    max_amount: float | None,
+    interval: str | None = "yearly",
+) -> tuple[float | None, float | None, str, str]:
+    """Annualizes raw salary amounts and assigns a standardized salary bracket.
+
+    NOTE FOR FUTURE ANALYTICS:
+    Tracking historical min_salary, max_salary, interval, and date_posted week-to-week
+    enables wage trend modeling and offer comparison across similar roles during interviews.
+    """
+    if min_amount is None and max_amount is None:
+        return None, None, interval or "yearly", "Unspecified"
+
+    multiplier = 1.0
+    intv = (interval or "yearly").lower()
+    if "hour" in intv:
+        multiplier = 2080.0
+    elif "month" in intv:
+        multiplier = 12.0
+    elif "week" in intv:
+        multiplier = 52.0
+    elif "day" in intv:
+        multiplier = 260.0
+
+    annual_min = float(min_amount) * multiplier if min_amount is not None else None
+    annual_max = float(max_amount) * multiplier if max_amount is not None else None
+
+    rep_salary = annual_max if annual_max is not None else annual_min
+    if rep_salary is None:
+        bracket = "Unspecified"
+    elif rep_salary < 80000:
+        bracket = "< $80k"
+    elif rep_salary < 120000:
+        bracket = "$80k - $120k"
+    elif rep_salary < 160000:
+        bracket = "$120k - $160k"
+    elif rep_salary < 200000:
+        bracket = "$160k - $200k"
+    else:
+        bracket = "$200k+"
+
+    return annual_min, annual_max, intv, bracket
+
 
 def parse_locations(raw: str) -> tuple[list[str], bool]:
-    """Parses a location string into individual physical locations and a remote flag.
-
-    Supports formats like:
-      - 'Philadelphia' -> (['Philadelphia'], False)
-      - 'Philadelphia, PA' -> (['Philadelphia, PA'], False)
-      - 'Philadelphia, PA, Remote' -> (['Philadelphia, PA'], True)
-      - 'Philadelphia, PA; New York, NY' -> (['Philadelphia, PA', 'New York, NY'], False)
-      - 'Remote' -> ([], True)
-    """
+    """Parses a location string into individual physical locations and a remote flag."""
     if not raw or not raw.strip():
         return [], False
 
-    # Check for explicit multi-location delimiters first
     if ";" in raw or "|" in raw:
         chunks = re.split(r"[;|]", raw)
     else:
-        # Split on commas and reconstruct City, State abbreviations
         raw_chunks = [c.strip() for c in raw.split(",") if c.strip()]
         chunks = []
         i = 0
@@ -122,7 +214,6 @@ def fetch_jobs(
     if not sites:
         sites = ["linkedin", "indeed", "google"]
 
-    # Filter to valid supported site names
     valid_sites = {"linkedin", "indeed", "zip_recruiter", "glassdoor", "google"}
     active_sites = [s for s in sites if s in valid_sites]
     if not active_sites:
@@ -131,13 +222,11 @@ def fetch_jobs(
     physical_locations, detected_remote = parse_locations(location)
     effective_remote = is_remote or detected_remote
 
-    # Determine location search targets
     targets: list[tuple[str | None, bool]] = []
     if physical_locations:
         for loc in physical_locations:
             targets.append((loc, effective_remote))
     elif effective_remote:
-        # Remote only without specific city
         targets.append((None, True))
     else:
         targets.append((location or None, False))
@@ -171,7 +260,6 @@ def fetch_jobs(
                 company = str(row.get("company", ""))
                 loc = str(row.get("location", ""))
 
-                # Deduplication key across multiple site/location batches
                 dedup_key = (
                     job_id if job_id else f"{title.lower()}::{company.lower()}::{loc.lower()}"
                 )
@@ -179,17 +267,24 @@ def fetch_jobs(
                     continue
                 seen_keys.add(dedup_key)
 
+                raw_min = row.get("min_amount")
+                raw_max = row.get("max_amount")
+                interval = str(row.get("interval", "yearly")) if row.get("interval") else "yearly"
+                currency = str(row.get("currency", "USD")) if row.get("currency") else "USD"
+
+                annual_min, annual_max, salary_interval, salary_bracket = categorize_salary(
+                    min_amount=float(raw_min) if raw_min is not None else None,
+                    max_amount=float(raw_max) if raw_max is not None else None,
+                    interval=interval,
+                )
+
                 salary_source = None
-                if row.get("min_amount") and row.get("max_amount"):
-                    interval = row.get("interval", "yearly")
-                    currency = row.get("currency", "USD")
-                    salary_source = (
-                        f"{currency} {row['min_amount']} - {row['max_amount']} / {interval}"
-                    )
-                elif row.get("min_amount"):
-                    interval = row.get("interval", "yearly")
-                    currency = row.get("currency", "USD")
-                    salary_source = f"{currency} {row['min_amount']} / {interval}"
+                if raw_min and raw_max:
+                    salary_source = f"{currency} {raw_min} - {raw_max} / {interval}"
+                elif raw_min:
+                    salary_source = f"{currency} {raw_min} / {interval}"
+
+                seniority_level = classify_seniority(title)
 
                 job = {
                     "job_id": job_id,
@@ -198,6 +293,11 @@ def fetch_jobs(
                     "company": company,
                     "location": loc,
                     "salary_source": salary_source,
+                    "min_salary": annual_min,
+                    "max_salary": annual_max,
+                    "salary_interval": salary_interval,
+                    "salary_bracket": salary_bracket,
+                    "seniority_level": seniority_level,
                     "job_url": row.get("job_url", ""),
                     "description": row.get("description", ""),
                     "date_posted": row.get("date_posted"),
