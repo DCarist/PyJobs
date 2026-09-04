@@ -38,7 +38,8 @@
         </span>
         {% endif %} {% if job.salary_bracket and job.salary_bracket != 'Unspecified' %}
         <span class="badge salary-badge">💰 {{ job.salary_bracket }}</span>
-        {% elif job.salary_source %}
+        {% elif job.salary_source and "nan" not in job.salary_source.lower() and "none" not in
+        job.salary_source.lower() %}
         <span class="badge salary-badge">💰 {{ job.salary_source }}</span>
         {% endif %} {% if job.date_posted %}
         <span class="badge">🕒 {{ job.date_posted.strftime('%b %d, %Y') }}</span>
@@ -123,7 +124,8 @@
     </span>
     {% endif %} {% if job.salary_bracket and job.salary_bracket != 'Unspecified' %}
     <span class="badge salary-badge">💰 {{ job.salary_bracket }}</span>
-    {% elif job.salary_source %}
+    {% elif job.salary_source and "nan" not in job.salary_source.lower() and "none" not in
+    job.salary_source.lower() %}
     <span class="badge salary-badge">💰 {{ job.salary_source }}</span>
     {% endif %} {% if job.date_posted %}
     <span class="badge">🕒 {{ job.date_posted.strftime('%b %d, %Y') }}</span>

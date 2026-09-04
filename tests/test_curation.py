@@ -5,23 +5,37 @@ import json
 import openpyxl
 from sqlalchemy.orm import Session
 
+from database import sync_job_classifications
 from models import SavedJob
-from scraper import categorize_salary, classify_seniority
+from scraper import _parse_valid_float, categorize_salary, classify_seniority
 
 
 def test_classify_seniority():
     assert classify_seniority("VP of Engineering") == "Executive / VP"
     assert classify_seniority("Chief Technology Officer") == "Executive / VP"
     assert classify_seniority("Head of Quality") == "Executive / VP"
+    assert classify_seniority("SVP, Finance") == "Executive / VP"
+    assert classify_seniority("EVP of Operations") == "Executive / VP"
+    assert classify_seniority("AVP, Clinical Operations") == "Executive / VP"
+    assert classify_seniority("President and CEO") == "Executive / VP"
+    assert classify_seniority("Executive Director, Quality Systems") == "Executive / VP"
+
     assert classify_seniority("Director of Quality Assurance") == "Director"
     assert classify_seniority("Dir. Manufacturing") == "Director"
+    assert classify_seniority("Sr Director, Global Operations Leader") == "Director"
+
     assert classify_seniority("Engineering Manager") == "Manager"
     assert classify_seniority("QA Manager") == "Manager"
+    assert classify_seniority("Manager, Quality Systems and Risk Management") == "Manager"
+    assert classify_seniority("Manager, Corrective Action & Continuous Improvement") == "Manager"
+    assert classify_seniority("Senior Manager, Clinical Product Quality") == "Manager"
+
     assert classify_seniority("QA Team Lead") == "Supervisor / Lead"
     assert classify_seniority("Tech Lead - Python") == "Supervisor / Lead"
     assert classify_seniority("Senior Software Engineer") == "Senior / Principal"
     assert classify_seniority("Sr. Automation Engineer") == "Senior / Principal"
     assert classify_seniority("Staff System Architect") == "Senior / Principal"
+
     assert classify_seniority("Quality Assurance Specialist") == "Specialist / Contributor"
     assert classify_seniority("Software Engineer") == "Specialist / Contributor"
     assert classify_seniority("") == "Specialist / Contributor"
@@ -258,3 +272,61 @@ def test_export_jobs_json(client, db_session):
     assert len(parsed) == 3  # Non-hidden jobs
     titles = [item["Title"] for item in parsed]
     assert "Director of QA" in titles
+
+
+def test_parse_valid_float():
+    assert _parse_valid_float(None) is None
+    assert _parse_valid_float(float("nan")) is None
+    assert _parse_valid_float("nan") is None
+    assert _parse_valid_float("NaN") is None
+    assert _parse_valid_float("invalid") is None
+    assert _parse_valid_float(120000) == 120000.0
+    assert _parse_valid_float("55.5") == 55.5
+
+
+def test_sync_job_classifications(db_session):
+    # Seed outdated/unclassified job records
+    job1 = SavedJob(
+        job_id="sync-1",
+        title="QA Manager",
+        company="HealthCorp",
+        location="Philadelphia, PA",
+        site="linkedin",
+        seniority_level="Specialist / Contributor",  # Stale/default
+        salary_bracket="Unspecified",
+        salary_source="USD 120000.0 - 150000.0 / yearly",
+        min_salary=None,
+        max_salary=None,
+    )
+    job2 = SavedJob(
+        job_id="sync-2",
+        title="Sr Director of Engineering",
+        company="TechCorp",
+        location="Remote",
+        site="linkedin",
+        seniority_level="Specialist / Contributor",  # Stale/default
+        salary_bracket="Unspecified",
+        salary_source="None nan - nan / None",  # Corrupted source
+        min_salary=None,
+        max_salary=None,
+    )
+    db_session.add_all([job1, job2])
+    db_session.commit()
+
+    # Run synchronization
+    updated = sync_job_classifications(db_session)
+    assert updated == 2
+
+    db_session.refresh(job1)
+    db_session.refresh(job2)
+
+    # Verify job1 was reclassified and salary backfilled
+    assert job1.seniority_level == "Manager"
+    assert job1.min_salary == 120000.0
+    assert job1.max_salary == 150000.0
+    assert job1.salary_bracket == "$120k - $160k"
+
+    # Verify job2 was reclassified and corrupt salary_source cleaned to None
+    assert job2.seniority_level == "Director"
+    assert job2.salary_source is None
+    assert job2.salary_bracket == "Unspecified"

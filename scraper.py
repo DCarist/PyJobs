@@ -69,7 +69,8 @@ SENIORITY_RULES: list[tuple[str, re.Pattern[str]]] = [
     (
         "Executive / VP",
         re.compile(
-            r"\b(vp|vice president|chief|cto|cio|cso|cpo|ceo|c-level|head of)\b",
+            r"\b(vp|vice president|president|svp|evp|avp|chief|cto|cio|cso|"
+            r"cpo|ceo|cfo|coo|cmo|c-level|head of|executive director)\b",
             re.IGNORECASE,
         ),
     ),
@@ -100,6 +101,17 @@ SENIORITY_RULES: list[tuple[str, re.Pattern[str]]] = [
     ),
 ]
 DEFAULT_SENIORITY = "Specialist / Contributor"
+
+
+def _parse_valid_float(val: Any) -> float | None:
+    """Safely parses a numerical value into a float, rejecting None, NaN, and corrupt strings."""
+    if val is None or pd.isna(val):
+        return None
+    try:
+        f = float(val)
+        return None if (pd.isna(f) or str(f).lower() == "nan") else f
+    except ValueError, TypeError:
+        return None
 
 
 def classify_seniority(title: str) -> str:
@@ -267,22 +279,24 @@ def fetch_jobs(
                     continue
                 seen_keys.add(dedup_key)
 
-                raw_min = row.get("min_amount")
-                raw_max = row.get("max_amount")
+                raw_min = _parse_valid_float(row.get("min_amount"))
+                raw_max = _parse_valid_float(row.get("max_amount"))
                 interval = str(row.get("interval", "yearly")) if row.get("interval") else "yearly"
                 currency = str(row.get("currency", "USD")) if row.get("currency") else "USD"
 
                 annual_min, annual_max, salary_interval, salary_bracket = categorize_salary(
-                    min_amount=float(raw_min) if raw_min is not None else None,
-                    max_amount=float(raw_max) if raw_max is not None else None,
+                    min_amount=raw_min,
+                    max_amount=raw_max,
                     interval=interval,
                 )
 
                 salary_source = None
-                if raw_min and raw_max:
+                if raw_min is not None and raw_max is not None:
                     salary_source = f"{currency} {raw_min} - {raw_max} / {interval}"
-                elif raw_min:
+                elif raw_min is not None:
                     salary_source = f"{currency} {raw_min} / {interval}"
+                elif raw_max is not None:
+                    salary_source = f"{currency} {raw_max} / {interval}"
 
                 seniority_level = classify_seniority(title)
 

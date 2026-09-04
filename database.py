@@ -64,3 +64,77 @@ def init_db() -> None:
                     conn.execute(text(sql_stmt))
 
         conn.commit()
+
+    # Backfill and synchronize existing job classifications and salary data
+    sync_job_classifications()
+
+
+def sync_job_classifications(session=None) -> int:
+    """Re-evaluates seniority levels and repairs salary data on existing jobs in SQLite.
+
+    Ensures existing database records are automatically kept in sync whenever taxonomy rules
+    or salary parser logic are updated, without requiring manual database re-seeding.
+    """
+    import re
+
+    from models import SavedJob
+    from scraper import categorize_salary, classify_seniority
+
+    owns_session = False
+    if session is None:
+        session = SessionLocal()
+        owns_session = True
+
+    updated_count = 0
+    try:
+        jobs = session.query(SavedJob).all()
+        for job in jobs:
+            modified = False
+
+            # 1. Re-evaluate seniority classification
+            expected_seniority = classify_seniority(job.title)
+            if job.seniority_level != expected_seniority:
+                job.seniority_level = expected_seniority
+                modified = True
+
+            # 2. Clean corrupted salary_source strings (e.g. "None nan - nan / None")
+            if job.salary_source and any(
+                garbage in job.salary_source.lower() for garbage in ["nan", "none nan"]
+            ):
+                job.salary_source = None
+                modified = True
+
+            # 3. Backfill salary bracket and min/max if missing but salary_source has numbers
+            if (job.min_salary is None and job.max_salary is None) and job.salary_source:
+                m = re.search(r"([\d\.]+)\s*-\s*([\d\.]+)\s*/\s*(\w+)", job.salary_source)
+                if m:
+                    try:
+                        raw_min = float(m.group(1))
+                        raw_max = float(m.group(2))
+                        interval = m.group(3)
+                        ann_min, ann_max, intv, bracket = categorize_salary(
+                            min_amount=raw_min,
+                            max_amount=raw_max,
+                            interval=interval,
+                        )
+                        job.min_salary = ann_min
+                        job.max_salary = ann_max
+                        job.salary_interval = intv
+                        job.salary_bracket = bracket
+                        modified = True
+                    except ValueError, TypeError:
+                        pass
+
+            if modified:
+                updated_count += 1
+
+        if updated_count > 0:
+            session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        if owns_session:
+            session.close()
+
+    return updated_count

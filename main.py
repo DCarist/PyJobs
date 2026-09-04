@@ -369,10 +369,21 @@ async def search_jobs(request: Request, db: Session = Depends(get_db)):
                 is_hidden=False,
             )
             db.add(new_job)
-            try:
-                db.commit()
-            except IntegrityError:
-                db.rollback()
+        else:
+            # Refresh classification and salary metadata on existing job
+            if j.get("seniority_level"):
+                existing_job.seniority_level = j["seniority_level"]
+            if j.get("salary_bracket") and j["salary_bracket"] != "Unspecified":
+                existing_job.salary_bracket = j["salary_bracket"]
+                existing_job.min_salary = j.get("min_salary")
+                existing_job.max_salary = j.get("max_salary")
+                existing_job.salary_interval = j.get("salary_interval")
+                existing_job.salary_source = j.get("salary_source")
+
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
 
     # Re-query filtered active jobs
     jobs = (
