@@ -21,6 +21,16 @@ uv tool install ty
 ```
 
 ### Running the Application
+
+**Option 1: One-Click Launcher (Recommended)**
+Double-click `run.bat` in the project root. It will start the server and automatically open PyJobs in your default web browser.
+
+**Option 2: CLI Command**
+```bash
+uv run pyjobs
+```
+
+**Option 3: Direct Uvicorn**
 ```bash
 uv run uvicorn main:app --reload
 ```

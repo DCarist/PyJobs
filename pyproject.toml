@@ -15,6 +15,9 @@ dependencies = [
     "uvicorn>=0.44.0",
 ]
 
+[project.scripts]
+pyjobs = "run:main"
+
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
@@ -38,7 +41,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["database", "models", "scraper"]
+known-first-party = ["database", "models", "run", "scraper"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
