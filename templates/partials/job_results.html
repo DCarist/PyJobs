@@ -1,56 +1,71 @@
-{% if jobs %}
-    {% for job in jobs %}
-    <div class="job-card glass-panel" id="job-{{ job.id }}">
-        <div class="job-header">
-            <div>
-                <h3 class="job-title">{{ job.title }}</h3>
-                <p class="job-company">{{ job.company }}</p>
-            </div>
-            {% if job.site %}
-            <span class="badge site-badge">{{ job.site|capitalize }}</span>
-            {% endif %}
-        </div>
-        
-        <div class="job-meta">
-            {% if job.location %}
-            <span class="badge">
-                📍 <a href="https://www.google.com/maps/search/?api=1&query={{ job.location|urlencode }}" target="_blank" class="external-link" style="color: inherit;">{{ job.location }}</a>
-            </span>
-            {% endif %}
-            
-            {% if job.salary_source %}
-            <span class="badge">💰 {{ job.salary_source }}</span>
-            {% endif %}
-            
-            {% if job.date_posted %}
-            <span class="badge">🕒 {{ job.date_posted.strftime('%b %d, %Y') if job.date_posted else '' }}</span>
-            {% endif %}
-        </div>
-        
-        <div class="actions-bar">
-            {% if job.job_url %}
-            <a href="{{ job.job_url }}" target="_blank" class="btn-primary btn-small" style="text-decoration: none; text-align: center;">Apply Here</a>
-            {% endif %}
-            <button class="btn-secondary btn-small"
-                    hx-get="/job/{{ job.id }}"
-                    hx-target="#job-details-{{ job.id }}"
-                    hx-swap="innerHTML">
-                View Details
-            </button>
-            <button class="btn-secondary btn-small"
-                    hx-delete="/job/{{ job.id }}"
-                    hx-target="#job-{{ job.id }}"
-                    hx-swap="outerHTML">
-                Hide
-            </button>
-        </div>
-        
-        <!-- Placeholder for expanded details -->
-        <div id="job-details-{{ job.id }}"></div>
+{% if jobs %} {% for job in jobs %}
+<div class="job-card glass-panel" id="job-{{ job.id }}">
+  <div class="job-header">
+    <div>
+      <h3 class="job-title">{{ job.title }}</h3>
+      <p class="job-company">{{ job.company }}</p>
     </div>
-    {% endfor %}
-{% else %}
-    <div class="error-msg">
-        No jobs found for these criteria. Try adjusting your preferences or reducing keywords.
-    </div>
+    {% if job.site %}
+    <span class="badge site-badge">{{ job.site|capitalize }}</span>
+    {% endif %}
+  </div>
+
+  <div class="job-meta">
+    {% if job.location %}
+    <span class="badge">
+      📍
+      <a
+        href="https://www.google.com/maps/search/?api=1&query={{ job.location|urlencode }}"
+        target="_blank"
+        class="external-link"
+        style="color: inherit;"
+        >{{ job.location }}</a
+      >
+    </span>
+    {% endif %} {% if job.salary_source %}
+    <span class="badge">💰 {{ job.salary_source }}</span>
+    {% endif %} {% if job.date_posted %}
+    <span class="badge"
+      >🕒 {{ job.date_posted.strftime('%b %d, %Y') if job.date_posted else '' }}</span
+    >
+    {% endif %}
+  </div>
+
+  <div class="actions-bar">
+    {% if job.job_url %}
+    <a
+      href="{{ job.job_url }}"
+      target="_blank"
+      class="btn-primary btn-small"
+      style="text-decoration: none; text-align: center;"
+      >Apply Here</a
+    >
+    {% endif %}
+    <button
+      type="button"
+      class="btn-secondary btn-small"
+      hx-get="/job/{{ job.id }}"
+      hx-target="#job-details-{{ job.id }}"
+      hx-swap="innerHTML"
+    >
+      View Details
+    </button>
+    <button
+      type="button"
+      class="btn-secondary btn-small"
+      hx-delete="/job/{{ job.id }}"
+      hx-target="#job-{{ job.id }}"
+      hx-swap="outerHTML"
+    >
+      Hide
+    </button>
+  </div>
+
+  <!-- Placeholder for expanded details -->
+  <div id="job-details-{{ job.id }}"></div>
+</div>
+{% endfor %} {% else %}
+<div class="error-msg">
+  No jobs found for these criteria. Try adjusting your preferences or reducing keywords.
+</div>
 {% endif %}

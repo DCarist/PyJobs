@@ -12,13 +12,14 @@
 }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   background-color: var(--bg-color);
   color: var(--text-primary);
   margin: 0;
   min-height: 100vh;
-  background-image: radial-gradient(circle at top right, rgba(59, 130, 246, 0.15), transparent 40%),
-                    radial-gradient(circle at bottom left, rgba(139, 92, 246, 0.15), transparent 40%);
+  background-image:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.15), transparent 40%),
+    radial-gradient(circle at bottom left, rgba(139, 92, 246, 0.15), transparent 40%);
   background-attachment: fixed;
 }
 
@@ -81,7 +82,9 @@ label {
   font-weight: 500;
 }
 
-input, select, textarea {
+input,
+select,
+textarea {
   background: rgba(15, 23, 42, 0.6);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
@@ -107,7 +110,9 @@ input:focus {
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
   width: 100%;
   font-size: 1rem;
 }
@@ -118,7 +123,7 @@ input:focus {
 }
 
 .btn-secondary {
-  background: rgba(255,255,255,0.1);
+  background: rgba(255, 255, 255, 0.1);
   color: white;
   border: 1px solid var(--border-color);
   padding: 0.75rem 1.5rem;
@@ -130,13 +135,15 @@ input:focus {
 }
 
 .btn-secondary:hover {
-  background: rgba(255,255,255,0.2);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .job-card {
   padding: 1.5rem;
   margin-bottom: 1rem;
-  transition: transform 0.2s, background 0.2s;
+  transition:
+    transform 0.2s,
+    background 0.2s;
   animation: fadeIn 0.5s ease-out;
 }
 
@@ -207,7 +214,7 @@ input:focus {
 }
 
 .loader {
-  border: 3px solid rgba(255,255,255,0.1);
+  border: 3px solid rgba(255, 255, 255, 0.1);
   border-radius: 50%;
   border-top: 3px solid var(--primary);
   width: 24px;
@@ -226,18 +233,32 @@ input:focus {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes fadeInDown {
-  from { opacity: 0; transform: translateY(-20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .job-details {

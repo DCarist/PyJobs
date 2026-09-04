@@ -1,11 +1,15 @@
 <div class="job-details">
-    <div style="margin-bottom: 1rem;">
-        <strong>Description:</strong><br>
-        {% if job.description %}
-            {{ job.description | replace('\n', '<br>') | safe }}
-        {% else %}
-            <em>No description available.</em>
-        {% endif %}
-    </div>
-    <button class="btn-secondary btn-small" onclick="document.getElementById('job-details-{{ job.id }}').innerHTML = '';">Close Details</button>
+  <div style="margin-bottom: 1rem;">
+    <strong>Description:</strong><br>
+    {% if job.description %} {{ job.description | replace('\n', '<br>') | safe }} {% else %}
+    <em>No description available.</em>
+    {% endif %}
+  </div>
+  <button
+    type="button"
+    class="btn-secondary btn-small"
+    onclick="document.getElementById('job-details-{{ job.id }}').innerHTML = '';"
+  >
+    Close Details
+  </button>
 </div>

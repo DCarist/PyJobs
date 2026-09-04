@@ -1,25 +1,30 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
+  <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PyJobs | Premium Job Scraper</title>
     <!-- Modern Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    >
     <!-- CSS -->
     <link rel="stylesheet" href="/static/styles.css">
     <!-- HTMX -->
-    <script src="https://unpkg.com/htmx.org@1.9.10" integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" crossorigin="anonymous"></script>
-</head>
-<body>
+    <script
+      src="https://unpkg.com/htmx.org@1.9.10"
+      integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC"
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body>
     <div class="container">
-        <header>
-            <h1>PyJobs</h1>
-            <p class="subtitle">Intelligent Job Curation & Scraping Engine</p>
-        </header>
-        <main>
-            {% block content %}{% endblock %}
-        </main>
+      <header>
+        <h1>PyJobs</h1>
+        <p class="subtitle">Intelligent Job Curation & Scraping Engine</p>
+      </header>
+      <main>{% block content %}{% endblock %}</main>
     </div>
-</body>
+  </body>
 </html>
