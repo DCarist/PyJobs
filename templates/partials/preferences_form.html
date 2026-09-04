@@ -1,0 +1,23 @@
+<form hx-post="/preferences" hx-target="#preferences-container">
+    <div class="form-group">
+        <label for="location">Location</label>
+        <input type="text" id="location" name="location" value="{{ pref.location if pref else '' }}" placeholder="e.g. Dallas, TX">
+        <small style="color: var(--text-secondary); font-size: 0.8rem; display: block; margin-top: 0.25rem;">Searches within a 50-mile radius by default.</small>
+    </div>
+    
+    <div class="form-group">
+        <label for="positions">Position</label>
+        <input type="text" id="positions" name="positions" value="{{ pref.positions if pref else '' }}" placeholder="e.g. Software Engineer">
+    </div>
+    
+    <div class="form-group">
+        <label for="fields">Field / Keywords (Optional)</label>
+        <input type="text" id="fields" name="fields" value="{{ pref.fields if pref else '' }}" placeholder="e.g. Python, Remote">
+    </div>
+    
+    <button type="submit" class="btn-secondary">Save Preferences</button>
+    
+    {% if message %}
+    <div class="success-msg">{{ message }}</div>
+    {% endif %}
+</form>

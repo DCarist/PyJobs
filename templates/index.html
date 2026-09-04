@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid">
+    <!-- Left Column: Preferences -->
+    <div class="glass-panel" style="padding: 1.5rem; height: fit-content;">
+        <h2 style="margin-top: 0;">Search Preferences</h2>
+        <div id="preferences-container">
+            {% include "partials/preferences_form.html" %}
+        </div>
+    </div>
+
+    <!-- Right Column: Results & Search Action -->
+    <div class="glass-panel" style="padding: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h2 style="margin: 0;">Curated Jobs</h2>
+            <button class="btn-primary" 
+                    hx-post="/search" 
+                    hx-target="#job-results" 
+                    hx-indicator="#search-loader"
+                    style="width: auto;">
+                <span class="btn-text">Find Jobs</span>
+                <div class="loader" id="search-loader"></div>
+            </button>
+        </div>
+        
+        <div id="job-results">
+            <p style="color: var(--text-secondary); text-align: center; padding: 2rem 0;">
+                Click "Find Jobs" to start scraping across multiple sites.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
