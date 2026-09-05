@@ -3,8 +3,8 @@
   <a
     href="{{ job.job_url }}"
     target="_blank"
-    class="btn-primary btn-small"
-    style="text-decoration: none; text-align: center;"
+    class="btn-primary btn-small btn-apply"
+    title="Apply directly on job board or employer site"
   >
     Apply Here
   </a>
@@ -15,8 +15,8 @@
   </span>
   <a
     href="/applications/{{ tracked_app.id }}"
-    class="btn-secondary btn-small btn-view-app"
-    style="text-decoration: none; text-align: center;"
+    class="btn-track-active btn-small"
+    title="Open this application in the Tracker"
   >
     View Application
   </a>
@@ -35,10 +35,10 @@
 
   <button
     type="button"
-    class="btn-secondary btn-small"
-    hx-get="/job/{{ job.id }}"
-    hx-target="#job-details-{{ job.id }}"
-    hx-swap="innerHTML"
+    id="view-details-btn-{{ job.id }}"
+    class="btn-details btn-small"
+    onclick="toggleJobDetails('{{ job.id }}')"
+    title="Toggle full job description"
   >
     View Details
   </button>
@@ -46,20 +46,22 @@
   {% if job.is_hidden %}
   <button
     type="button"
-    class="btn-secondary btn-small"
+    class="btn-subtle btn-small btn-hide"
     hx-post="/job/{{ job.id }}/unhide"
     hx-target="#job-{{ job.id }}"
     hx-swap="outerHTML"
+    title="Restore this posting to feed"
   >
     Unhide
   </button>
   {% else %}
   <button
     type="button"
-    class="btn-secondary btn-small"
+    class="btn-subtle btn-small btn-hide"
     hx-post="/job/{{ job.id }}/hide"
     hx-target="#job-{{ job.id }}"
     hx-swap="outerHTML"
+    title="Hide this posting from feed"
   >
     Hide
   </button>

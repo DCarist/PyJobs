@@ -104,6 +104,34 @@ def test_get_job_detail(client, db_session):
     assert "Detailed job description here." in response.text
 
 
+def test_get_job_detail_markdown_rendering(client, db_session):
+    markdown_text = (
+        "**Why join us:**\n\n"
+        "**Culture:** Flexible work\\-life balance \\& perks.\n\n"
+        "* Develop strategies\n"
+        "* Lead cross-functional teams"
+    )
+    job = SavedJob(
+        job_id="md-1",
+        site="indeed",
+        title="Category Manager",
+        company="Superior Plus",
+        location="Wayne, PA",
+        job_url="https://example.com/job/md",
+        description=markdown_text,
+    )
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    response = client.get(f"/job/{job.id}")
+    assert response.status_code == 200
+    assert "<strong>Why join us:</strong>" in response.text
+    assert "work-life balance &amp; perks" in response.text
+    assert "<li>Develop strategies</li>" in response.text
+    assert "<li>Lead cross-functional teams</li>" in response.text
+
+
 def test_get_job_detail_not_found(client):
     response = client.get("/job/999999")
     assert response.status_code == 200

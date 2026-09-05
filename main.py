@@ -1,8 +1,10 @@
 import datetime
 import io
 import os
+import re
 from typing import TypedDict
 
+import markdown
 import pandas as pd
 from fastapi import Depends, FastAPI, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -21,6 +23,18 @@ from models import (
     UserPreference,
 )
 from scraper import fetch_jobs
+
+
+def render_markdown(text: str | None) -> str:
+    """Renders job description markdown/plain-text into formatted HTML."""
+    if not text:
+        return ""
+    # Strip backslash escapes before markdown punctuation and symbols (e.g. \-, \&, \*, \_)
+    cleaned = re.sub(r"\\([-_*#&`~\[\]()])", r"\1", text)
+    return markdown.markdown(
+        cleaned,
+        extensions=["extra", "nl2br", "sane_lists"],
+    )
 
 
 class WorkSearchLogEntry(TypedDict):
@@ -47,6 +61,7 @@ os.makedirs("static", exist_ok=True)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+templates.env.filters["render_markdown"] = render_markdown
 
 
 # Dependency

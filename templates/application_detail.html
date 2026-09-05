@@ -286,10 +286,10 @@
         <div id="desc-view-box" style="margin-top: 0.85rem;">
           {% if application.description %}
           <div
-            class="job-description-content"
-            style="max-height: 360px; overflow-y: auto; white-space: pre-line;"
+            class="job-description-content markdown-body"
+            style="max-height: 380px; overflow-y: auto;"
           >
-            {{ application.description }}
+            {{ application.description | render_markdown | safe }}
           </div>
           {% else %}
           <div style="color: var(--text-secondary); font-size: 0.875rem; padding: 1rem 0;">
