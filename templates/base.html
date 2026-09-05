@@ -20,9 +20,30 @@
   </head>
   <body>
     <div class="container">
-      <header>
-        <h1>PyJobs</h1>
-        <p class="subtitle">Intelligent Job Curation & Scraping Engine</p>
+      <header class="app-header">
+        <div class="header-brand">
+          <a href="/" class="brand-link">
+            <h1 class="brand-title">PyJobs</h1>
+          </a>
+          <p class="subtitle">Intelligent Job Curation & Application Tracker</p>
+        </div>
+        <nav class="top-nav" aria-label="Main Navigation">
+          <a href="/" class="nav-tab {% if active_page == 'curation' %}active{% endif %}">
+            <span>🌐 Discover & Curate</span>
+          </a>
+          <a
+            href="/applications"
+            class="nav-tab {% if active_page == 'applications' %}active{% endif %}"
+          >
+            <span>📋 Application Tracker</span>
+          </a>
+          <a
+            href="/applications/unemployment-report"
+            class="nav-tab {% if active_page == 'unemployment' %}active{% endif %}"
+          >
+            <span>📑 Work-Search Log</span>
+          </a>
+        </nav>
       </header>
       <main>{% block content %}{% endblock %}</main>
     </div>

@@ -1,0 +1,121 @@
+<div class="table-responsive glass-panel" id="applications-table-wrapper" style="padding: 1rem;">
+  {% if applications %}
+  <table class="applications-table">
+    <thead>
+      <tr>
+        <th>Date Applied</th>
+        <th>Company & Role</th>
+        <th>Method & Portal</th>
+        <th>Status</th>
+        <th>Next Follow-Up</th>
+        <th>Contacts</th>
+        <th style="text-align: right;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for app in applications %}
+      <tr id="app-row-{{ app.id }}">
+        <td class="date-cell">
+          {{ app.applied_date.strftime('%b %d, %Y') if app.applied_date else "—" }}
+        </td>
+        <td class="role-cell">
+          <a href="/applications/{{ app.id }}" class="table-job-title">
+            {{ app.title or "Untitled Role" }}
+          </a>
+          <div class="table-company-meta">
+            <span>{{ app.company }}</span>
+            {% if app.location %}
+            <span class="table-location">· {{ app.location }}</span>
+            {% endif %}
+          </div>
+        </td>
+        <td>
+          <span class="badge method-badge">{{ app.method }}</span>
+          {% if app.account_created %}
+          <span class="badge portal-badge" title="Account created on company portal"
+            >Portal Account</span
+          >
+          {% endif %}
+        </td>
+        <td>
+          <form
+            hx-post="/applications/{{ app.id }}/status"
+            hx-target="#applications-content"
+            hx-swap="innerHTML"
+            class="table-status-form"
+          >
+            <label for="table-status-{{ app.id }}" class="sr-only">Change Status</label>
+            <select
+              id="table-status-{{ app.id }}"
+              name="new_status"
+              class="quick-stage-select stage-select-{{ app.status }}"
+              hx-post="/applications/{{ app.id }}/status"
+              hx-target="#applications-content"
+              hx-swap="innerHTML"
+              hx-trigger="change"
+            >
+              {% for st_val, st_lbl in [('saved', 'Saved'), ('applied', 'Applied'), ('screening',
+              'Screening'), ('interviewing', 'Interviewing'), ('offer', 'Offer'), ('rejected',
+              'Rejected'), ('withdrawn', 'Withdrawn')] %} {% if app.status == st_val %}
+              <option value="{{ st_val }}" selected>{{ st_lbl }}</option>
+              {% else %}
+              <option value="{{ st_val }}">{{ st_lbl }}</option>
+              {% endif %} {% endfor %}
+            </select>
+          </form>
+        </td>
+        <td>
+          {% if app.follow_up_date %}
+          <span
+            class="follow-up-badge {% if today > app.follow_up_date %}overdue{% elif app.follow_up_date == today %}due-today{% endif %}"
+          >
+            {{ app.follow_up_date.strftime('%b %d, %Y') }}
+          </span>
+          {% else %}
+          <span style="color: var(--text-secondary);">—</span>
+          {% endif %}
+        </td>
+        <td>
+          <span class="badge"> 👤 {{ app.contacts|length }} </span>
+        </td>
+        <td style="text-align: right; white-space: nowrap;">
+          <a
+            href="/applications/{{ app.id }}"
+            class="btn-secondary btn-small"
+            style="text-decoration: none;"
+          >
+            Manage
+          </a>
+          <button
+            type="button"
+            class="btn-icon-danger"
+            hx-delete="/applications/{{ app.id }}"
+            hx-target="#app-row-{{ app.id }}"
+            hx-swap="outerHTML"
+            hx-confirm="Are you sure you want to delete this tracked application?"
+            title="Delete Application"
+          >
+            🗑️
+          </button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state-box" style="text-align: center; padding: 3rem 1rem;">
+    <h3>No Tracked Applications Found</h3>
+    <p style="color: var(--text-secondary); max-width: 480px; margin: 0.5rem auto 1.5rem;">
+      Track postings from the Discover feed with 1 click, or click "+ Log External Application" to
+      record external job searches.
+    </p>
+    <a
+      href="/"
+      class="btn-primary"
+      style="display: inline-block; width: auto; text-decoration: none;"
+    >
+      Discover & Track Jobs
+    </a>
+  </div>
+  {% endif %}
+</div>

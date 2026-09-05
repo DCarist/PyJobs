@@ -1,0 +1,170 @@
+{% extends "base.html" %} {% block content %}
+<div class="unemployment-report-page">
+  <!-- Top Bar / Action Buttons -->
+  <div class="report-header-bar">
+    <div>
+      <a href="/applications" class="back-link no-print">
+        <span>← Back to Application Tracker</span>
+      </a>
+      <h2 style="margin: 0.5rem 0 0.25rem 0; font-size: 1.75rem;">Work-Search Activity Log</h2>
+      <p class="section-subtitle" style="margin: 0;">
+        Weekly documentation records for state unemployment work-search certification and audits.
+      </p>
+    </div>
+
+    <div class="report-actions no-print">
+      <button
+        type="button"
+        class="btn-secondary"
+        onclick="window.print()"
+        style="width: auto; padding: 0.65rem 1.25rem;"
+      >
+        <span>🖨️ Print / Save PDF</span>
+      </button>
+
+      <a
+        href="/applications/unemployment-report/export"
+        class="btn-primary"
+        style="text-decoration: none; width: auto; padding: 0.65rem 1.25rem;"
+      >
+        <span>⬇️ Export to CSV</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Summary Stats Banner -->
+  <div class="glass-panel report-summary-card" style="margin-top: 1.25rem; padding: 1.25rem;">
+    <div class="report-stats-grid">
+      <div class="stat-item">
+        <span class="stat-label">Total Work Searches</span>
+        <span class="stat-number">{{ total_activities_count }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Claim Weeks Recorded</span>
+        <span class="stat-number">{{ weekly_logs|length }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Reporting Standard</span>
+        <span class="stat-number" style="font-size: 1.1rem; color: #10b981;"
+          >3+ Searches / Week</span
+        >
+      </div>
+    </div>
+  </div>
+
+  <!-- Weekly Log Sections -->
+  <div class="weekly-logs-container" style="margin-top: 1.5rem;">
+    {% if weekly_logs %} {% for week in weekly_logs %}
+    <div class="weekly-claim-block glass-panel" style="margin-bottom: 2rem; padding: 1.5rem;">
+      <div class="week-header-row">
+        <div>
+          <h3 class="week-title" style="margin: 0; font-size: 1.2rem;">
+            Week Ending: Saturday, {{ week.week_ending.strftime('%B %d, %Y') }}
+          </h3>
+          <span class="week-subrange" style="color: var(--text-secondary); font-size: 0.85rem;">
+            Period: {{ week.week_start.strftime('%b %d') }} – {{ week.week_ending.strftime('%b %d,
+            %Y') }}
+          </span>
+        </div>
+
+        <div class="week-compliance-badge">
+          {% if week.records|length >= 3 %}
+          <span
+            class="badge"
+            style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); font-size: 0.85rem; padding: 0.35rem 0.75rem;"
+          >
+            ✓ {{ week.records|length }} Activities (Meets 3+ Requirement)
+          </span>
+          {% else %}
+          <span
+            class="badge"
+            style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-size: 0.85rem; padding: 0.35rem 0.75rem;"
+          >
+            ⚠️ {{ week.records|length }} Activities ({{ 3 - week.records|length }} more recommended)
+          </span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="table-responsive" style="margin-top: 1rem;">
+        <table class="compliance-table">
+          <thead>
+            <tr>
+              <th style="width: 12%;">Date</th>
+              <th style="width: 14%;">Activity Type</th>
+              <th style="width: 20%;">Employer / Organization</th>
+              <th style="width: 18%;">Job Title / Role</th>
+              <th style="width: 14%;">Method of Contact</th>
+              <th style="width: 12%;">Confirmation / Proof</th>
+              <th style="width: 10%;">Result / Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in week.records %}
+            <tr>
+              <td class="date-cell">{{ item.date.strftime('%m/%d/%Y') }}</td>
+              <td>
+                <span class="badge activity-type-badge">{{ item.activity_type }}</span>
+              </td>
+              <td>
+                <strong>{{ item.company }}</strong>
+              </td>
+              <td>{{ item.title }}</td>
+              <td>
+                <span>{{ item.method }}</span>
+                {% if item.portal_account %}
+                <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                  Portal Account Created
+                </div>
+                {% endif %}
+              </td>
+              <td>
+                {% if item.confirmation %}
+                <code style="font-size: 0.8rem;">{{ item.confirmation }}</code>
+                {% elif item.portal_username %}
+                <span style="font-size: 0.8rem; color: var(--text-secondary);"
+                  >User: {{ item.portal_username }}</span
+                >
+                {% else %}
+                <span style="color: var(--text-secondary);">Direct submission</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge stage-badge stage-{{ item.status|lower }}">
+                  {{ item.status|capitalize }}
+                </span>
+              </td>
+            </tr>
+            {% if item.notes %}
+            <tr class="log-notes-row">
+              <td
+                colspan="7"
+                style="padding-top: 0; padding-bottom: 0.75rem; font-size: 0.8rem; color: var(--text-secondary);"
+              >
+                <em>Notes: {{ item.notes }}</em>
+              </td>
+            </tr>
+            {% endif %} {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endfor %} {% else %}
+    <div class="glass-panel" style="text-align: center; padding: 3rem 1rem;">
+      <h3>No Work-Search Activity Recorded Yet</h3>
+      <p style="color: var(--text-secondary); max-width: 480px; margin: 0.5rem auto 1.5rem;">
+        When you track job applications, log interviews, or record recruiter follow-ups, they will
+        automatically be organized here by weekly claim periods.
+      </p>
+      <a
+        href="/"
+        class="btn-primary"
+        style="display: inline-block; width: auto; text-decoration: none;"
+      >
+        Discover & Track Jobs
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

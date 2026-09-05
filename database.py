@@ -63,6 +63,34 @@ def init_db() -> None:
                 if col_name not in job_columns:
                     conn.execute(text(sql_stmt))
 
+        # 3. Job applications column migrations
+        if "job_applications" in tables:
+            app_columns = [c["name"] for c in inspector.get_columns("job_applications")]
+            app_defs = [
+                (
+                    "account_created",
+                    "ALTER TABLE job_applications ADD COLUMN account_created BOOLEAN DEFAULT 0",
+                ),
+                (
+                    "portal_username",
+                    "ALTER TABLE job_applications ADD COLUMN portal_username VARCHAR DEFAULT NULL",
+                ),
+                (
+                    "confirmation_number",
+                    (
+                        "ALTER TABLE job_applications "
+                        "ADD COLUMN confirmation_number VARCHAR DEFAULT NULL"
+                    ),
+                ),
+                (
+                    "follow_up_date",
+                    "ALTER TABLE job_applications ADD COLUMN follow_up_date DATE DEFAULT NULL",
+                ),
+            ]
+            for col_name, sql_stmt in app_defs:
+                if col_name not in app_columns:
+                    conn.execute(text(sql_stmt))
+
         conn.commit()
 
     # Backfill and synchronize existing job classifications and salary data

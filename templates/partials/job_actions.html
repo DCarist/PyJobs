@@ -1,0 +1,67 @@
+<div class="actions-bar" id="job-actions-{{ job.id }}">
+  {% if job.job_url %}
+  <a
+    href="{{ job.job_url }}"
+    target="_blank"
+    class="btn-primary btn-small"
+    style="text-decoration: none; text-align: center;"
+  >
+    Apply Here
+  </a>
+  {% endif %} {% set tracked_app = tracked_map.get(job.id) if tracked_map else None %} {% if
+  tracked_app %}
+  <span class="badge tracked-badge" title="Tracked in your Application Tracker">
+    ✓ {{ tracked_app.status|capitalize }}
+  </span>
+  <a
+    href="/applications/{{ tracked_app.id }}"
+    class="btn-secondary btn-small btn-view-app"
+    style="text-decoration: none; text-align: center;"
+  >
+    View Application
+  </a>
+  {% else %}
+  <button
+    type="button"
+    class="btn-track btn-small"
+    hx-post="/job/{{ job.id }}/track"
+    hx-target="#job-actions-{{ job.id }}"
+    hx-swap="outerHTML"
+    title="Track this job in your Application Tracker"
+  >
+    📌 Track Application
+  </button>
+  {% endif %}
+
+  <button
+    type="button"
+    class="btn-secondary btn-small"
+    hx-get="/job/{{ job.id }}"
+    hx-target="#job-details-{{ job.id }}"
+    hx-swap="innerHTML"
+  >
+    View Details
+  </button>
+
+  {% if job.is_hidden %}
+  <button
+    type="button"
+    class="btn-secondary btn-small"
+    hx-post="/job/{{ job.id }}/unhide"
+    hx-target="#job-{{ job.id }}"
+    hx-swap="outerHTML"
+  >
+    Unhide
+  </button>
+  {% else %}
+  <button
+    type="button"
+    class="btn-secondary btn-small"
+    hx-post="/job/{{ job.id }}/hide"
+    hx-target="#job-{{ job.id }}"
+    hx-swap="outerHTML"
+  >
+    Hide
+  </button>
+  {% endif %}
+</div>
