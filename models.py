@@ -71,7 +71,7 @@ class JobApplication(Base):
     job_url: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
     description: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
 
-    # Status: saved, applied, screening, interviewing, offer, rejected, withdrawn
+    # Status: saved, applied, screening, interviewing, offer, rejected, withdrawn, cancelled
     status: Mapped[str] = mapped_column(String, default="applied", index=True)
     applied_date: Mapped[datetime.date | None] = mapped_column(Date, nullable=True, default=None)
     method: Mapped[str] = mapped_column(String, default="Company Website")

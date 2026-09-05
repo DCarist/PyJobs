@@ -26,7 +26,11 @@
         </div>
 
         <div class="kanban-card-meta">
-          {% if app.location %}
+          {% if col.id == 'closed' %}
+          <span class="badge stage-badge stage-{{ app.status }}"
+            >● {{ app.status|capitalize }}</span
+          >
+          {% endif %} {% if app.location %}
           <span class="badge meta-badge">📍 {{ app.location }}</span>
           {% endif %} {% if app.salary_stated %}
           <span class="badge meta-badge salary-badge">💰 {{ app.salary_stated }}</span>
@@ -40,7 +44,8 @@
         </div>
 
         <!-- Follow-up Due Indicator -->
-        {% if app.follow_up_date and app.status not in ['offer', 'rejected', 'withdrawn'] %}
+        {% if app.follow_up_date and app.status not in ['offer', 'rejected', 'withdrawn',
+        'cancelled'] %}
         <div
           class="follow-up-indicator {% if today > app.follow_up_date %}overdue{% elif app.follow_up_date == today %}due-today{% endif %}"
         >

@@ -1,3 +1,6 @@
+{% if request and request.headers.get('hx-request') %}
+<span class="badge" id="contacts-count-badge" hx-swap-oob="true">{{ contacts|length }}</span>
+{% endif %}
 <div id="application-contacts-container">
   {% if contacts %}
   <div class="contacts-list">
@@ -8,19 +11,29 @@
           <strong class="contact-name">{{ c.name }}</strong>
           <span class="badge contact-role-badge">{{ c.role }}</span>
         </div>
-        <button
-          type="button"
-          class="btn-icon-danger"
-          hx-delete="/applications/{{ c.application_id }}/contacts/{{ c.id }}"
-          hx-target="#application-contacts-container"
-          hx-swap="outerHTML"
-          title="Remove contact"
-        >
-          ✕
-        </button>
+        <div class="contact-card-actions">
+          <button
+            type="button"
+            class="btn-icon-secondary"
+            onclick="const form = document.getElementById('edit-contact-form-{{ c.id }}'); const details = document.getElementById('contact-details-{{ c.id }}'); if (form.style.display === 'none' || form.style.display === '') { form.style.display = 'block'; details.style.display = 'none'; } else { form.style.display = 'none'; details.style.display = 'block'; }"
+            title="Edit contact"
+          >
+            ✏️
+          </button>
+          <button
+            type="button"
+            class="btn-icon-danger"
+            hx-delete="/applications/{{ c.application_id }}/contacts/{{ c.id }}"
+            hx-target="#application-contacts-container"
+            hx-swap="outerHTML"
+            title="Remove contact"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
-      <div class="contact-card-body">
+      <div class="contact-card-body" id="contact-details-{{ c.id }}">
         {% if c.email %}
         <div class="contact-detail">
           <span class="contact-icon">✉️</span>
@@ -42,6 +55,110 @@
         <p class="contact-notes">{{ c.notes }}</p>
         {% endif %}
       </div>
+
+      <!-- Inline Contact Edit Form -->
+      <form
+        id="edit-contact-form-{{ c.id }}"
+        class="edit-contact-form"
+        style="display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);"
+        hx-post="/applications/{{ c.application_id }}/contacts/{{ c.id }}"
+        hx-target="#application-contacts-container"
+        hx-swap="outerHTML"
+      >
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label for="contact-edit-name-{{ c.id }}" style="font-size: 0.8rem;">Full Name *</label>
+            <input
+              type="text"
+              id="contact-edit-name-{{ c.id }}"
+              name="name"
+              value="{{ c.name }}"
+              required
+              style="padding: 0.5rem 0.75rem; font-size: 0.85rem;"
+            >
+          </div>
+          <div class="form-group">
+            <label for="contact-edit-role-{{ c.id }}" style="font-size: 0.8rem;"
+              >Role / Relationship *</label
+            >
+            <select
+              id="contact-edit-role-{{ c.id }}"
+              name="role"
+              style="padding: 0.5rem 0.75rem; font-size: 0.85rem;"
+            >
+              {% for r_val in ['Hiring Manager', 'Recruiter', 'Internal Referral', 'Executive /
+              Leadership', 'HR Representative'] %} {% if c.role == r_val %}
+              <option value="{{ r_val }}" selected>{{ r_val }}</option>
+              {% else %}
+              <option value="{{ r_val }}">{{ r_val }}</option>
+              {% endif %} {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-grid-2" style="margin-top: 0.5rem;">
+          <div class="form-group">
+            <label for="contact-edit-email-{{ c.id }}" style="font-size: 0.8rem;"
+              >Email Address</label
+            >
+            <input
+              type="email"
+              id="contact-edit-email-{{ c.id }}"
+              name="email"
+              value="{{ c.email or '' }}"
+              style="padding: 0.5rem 0.75rem; font-size: 0.85rem;"
+            >
+          </div>
+          <div class="form-group">
+            <label for="contact-edit-phone-{{ c.id }}" style="font-size: 0.8rem;"
+              >Phone Number</label
+            >
+            <input
+              type="tel"
+              id="contact-edit-phone-{{ c.id }}"
+              name="phone"
+              value="{{ c.phone or '' }}"
+              style="padding: 0.5rem 0.75rem; font-size: 0.85rem;"
+            >
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 0.5rem;">
+          <label for="contact-edit-linkedin-{{ c.id }}" style="font-size: 0.8rem;"
+            >LinkedIn URL</label
+          >
+          <input
+            type="url"
+            id="contact-edit-linkedin-{{ c.id }}"
+            name="linkedin_url"
+            value="{{ c.linkedin_url or '' }}"
+            style="padding: 0.5rem 0.75rem; font-size: 0.85rem;"
+          >
+        </div>
+
+        <div class="form-group" style="margin-top: 0.5rem;">
+          <label for="contact-edit-notes-{{ c.id }}" style="font-size: 0.8rem;"
+            >Context / Notes</label
+          >
+          <textarea
+            id="contact-edit-notes-{{ c.id }}"
+            name="notes"
+            rows="2"
+            style="padding: 0.5rem 0.75rem; font-size: 0.85rem;"
+          >{{ c.notes or '' }}</textarea>
+        </div>
+
+        <div style="margin-top: 0.75rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
+          <button
+            type="button"
+            class="btn-secondary btn-tiny"
+            onclick="document.getElementById('edit-contact-form-{{ c.id }}').style.display = 'none'; document.getElementById('contact-details-{{ c.id }}').style.display = 'block';"
+          >
+            Cancel
+          </button>
+          <button type="submit" class="btn-primary btn-tiny">Save Changes</button>
+        </div>
+      </form>
     </div>
     {% endfor %}
   </div>

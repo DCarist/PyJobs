@@ -571,7 +571,7 @@ async def applications_dashboard(
 
     if status and status != "all":
         if status == "closed":
-            query = query.filter(JobApplication.status.in_(["rejected", "withdrawn"]))
+            query = query.filter(JobApplication.status.in_(["rejected", "withdrawn", "cancelled"]))
         else:
             query = query.filter(JobApplication.status == status)
 
@@ -585,7 +585,7 @@ async def applications_dashboard(
         1
         for a in all_apps
         if a.follow_up_date
-        and a.status not in ["offer", "rejected", "withdrawn"]
+        and a.status not in ["offer", "rejected", "withdrawn", "cancelled"]
         and a.follow_up_date <= (today + datetime.timedelta(days=7))
     )
 
@@ -596,7 +596,7 @@ async def applications_dashboard(
         "screening": sum(1 for a in all_apps if a.status == "screening"),
         "interviewing": sum(1 for a in all_apps if a.status == "interviewing"),
         "offer": sum(1 for a in all_apps if a.status == "offer"),
-        "closed": sum(1 for a in all_apps if a.status in ["rejected", "withdrawn"]),
+        "closed": sum(1 for a in all_apps if a.status in ["rejected", "withdrawn", "cancelled"]),
         "due_soon": due_soon_count,
     }
 
@@ -641,7 +641,9 @@ async def applications_dashboard(
             "title": "Closed / Archived",
             "icon": "📁",
             "badge_class": "stage-closed",
-            "cards": [a for a in applications if a.status in ["rejected", "withdrawn"]],
+            "cards": [
+                a for a in applications if a.status in ["rejected", "withdrawn", "cancelled"]
+            ],
         },
     ]
 
@@ -1106,6 +1108,61 @@ async def delete_application_contact(
     if contact:
         db.delete(contact)
         db.commit()
+    if app_record:
+        db.refresh(app_record)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/application_contacts.html",
+        context={
+            "application": app_record,
+            "contacts": app_record.contacts if app_record else [],
+        },
+    )
+
+
+@app.post("/applications/{id}/contacts/{contact_id}", response_class=HTMLResponse)
+async def update_application_contact(
+    request: Request,
+    id: int,
+    contact_id: int,
+    name: str = Form(...),
+    role: str = Form("Hiring Manager"),
+    email: str = Form(""),
+    phone: str = Form(""),
+    linkedin_url: str = Form(""),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Updates an existing contact on an application."""
+    contact = (
+        db.query(ApplicationContact)
+        .filter(
+            ApplicationContact.id == contact_id,
+            ApplicationContact.application_id == id,
+        )
+        .first()
+    )
+    if not contact:
+        return HTMLResponse("Contact not found.", status_code=404)
+
+    contact.name = name.strip()
+    contact.role = role.strip()
+    contact.email = email.strip() or None
+    contact.phone = phone.strip() or None
+    contact.linkedin_url = linkedin_url.strip() or None
+    contact.notes = notes.strip() or None
+
+    activity = ApplicationActivity(
+        application_id=id,
+        activity_type="contact",
+        note=f"Updated contact: {contact.name} ({contact.role})",
+        activity_date=datetime.date.today(),
+    )
+    db.add(activity)
+    db.commit()
+
+    app_record = db.query(JobApplication).filter(JobApplication.id == id).first()
     if app_record:
         db.refresh(app_record)
 

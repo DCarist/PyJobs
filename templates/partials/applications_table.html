@@ -56,7 +56,8 @@
             >
               {% for st_val, st_lbl in [('saved', 'Saved'), ('applied', 'Applied'), ('screening',
               'Screening'), ('interviewing', 'Interviewing'), ('offer', 'Offer'), ('rejected',
-              'Rejected'), ('withdrawn', 'Withdrawn')] %} {% if app.status == st_val %}
+              'Rejected'), ('withdrawn', 'Withdrawn'), ('cancelled', 'Cancelled')] %} {% if
+              app.status == st_val %}
               <option value="{{ st_val }}" selected>{{ st_lbl }}</option>
               {% else %}
               <option value="{{ st_val }}">{{ st_lbl }}</option>

@@ -237,6 +237,12 @@ def test_contacts_management(client: TestClient, db_session: Session):
     db_session.refresh(app_record)
 
     # Add contact
+    # Verify detail page initially has only ONE contacts count badge (aligned right in card header)
+    resp_init = client.get(f"/applications/{app_record.id}")
+    assert resp_init.status_code == 200
+    assert resp_init.text.count('id="contacts-count-badge"') == 1
+
+    # Add contact via HTMX
     contact_data = {
         "name": "Sarah Connor",
         "role": "Hiring Manager",
@@ -245,10 +251,16 @@ def test_contacts_management(client: TestClient, db_session: Session):
         "linkedin_url": "https://linkedin.com/in/sarah",
         "notes": "Discussed distributed caching systems",
     }
-    resp = client.post(f"/applications/{app_record.id}/contacts", data=contact_data)
+    resp = client.post(
+        f"/applications/{app_record.id}/contacts",
+        data=contact_data,
+        headers={"HX-Request": "true"},
+    )
     assert resp.status_code == 200
     assert "Sarah Connor" in resp.text
     assert "Hiring Manager" in resp.text
+    assert 'id="contacts-count-badge"' in resp.text
+    assert 'hx-swap-oob="true"' in resp.text
 
     contact = (
         db_session.query(ApplicationContact)
@@ -258,13 +270,114 @@ def test_contacts_management(client: TestClient, db_session: Session):
     assert contact is not None
     assert contact.name == "Sarah Connor"
 
-    # Delete contact
-    resp_del = client.delete(f"/applications/{app_record.id}/contacts/{contact.id}")
+    # Verify detail page still has exactly ONE counter badge on full render
+    resp_after_add = client.get(f"/applications/{app_record.id}")
+    assert resp_after_add.status_code == 200
+    assert resp_after_add.text.count('id="contacts-count-badge"') == 1
+
+    # Edit contact via HTMX
+    edit_data = {
+        "name": "Sarah Connor-Reese",
+        "role": "Recruiter",
+        "email": "sarah.connor@meta.com",
+        "phone": "555-9999",
+        "linkedin_url": "https://linkedin.com/in/sarah-reese",
+        "notes": "Updated contact info after initial phone screen",
+    }
+    resp_edit = client.post(
+        f"/applications/{app_record.id}/contacts/{contact.id}",
+        data=edit_data,
+        headers={"HX-Request": "true"},
+    )
+    assert resp_edit.status_code == 200
+    assert "Sarah Connor-Reese" in resp_edit.text
+    assert "Recruiter" in resp_edit.text
+    db_session.refresh(contact)
+    assert contact.name == "Sarah Connor-Reese"
+    assert contact.role == "Recruiter"
+    assert contact.email == "sarah.connor@meta.com"
+
+    # Verify contact update activity was logged
+    act = (
+        db_session.query(ApplicationActivity)
+        .filter(
+            ApplicationActivity.application_id == app_record.id,
+            ApplicationActivity.activity_type == "contact",
+        )
+        .order_by(ApplicationActivity.id.desc())
+        .first()
+    )
+    assert act is not None
+    assert "Updated contact: Sarah Connor-Reese" in act.note
+
+    # Delete contact via HTMX
+    resp_del = client.delete(
+        f"/applications/{app_record.id}/contacts/{contact.id}",
+        headers={"HX-Request": "true"},
+    )
     assert resp_del.status_code == 200
+    assert 'id="contacts-count-badge"' in resp_del.text
     assert (
         db_session.query(ApplicationContact).filter(ApplicationContact.id == contact.id).first()
         is None
     )
+
+    # Verify detail page after delete still has exactly ONE counter badge
+    resp_after_del = client.get(f"/applications/{app_record.id}")
+    assert resp_after_del.status_code == 200
+    assert resp_after_del.text.count('id="contacts-count-badge"') == 1
+
+
+def test_cancelled_status_and_closed_bucket(client: TestClient, db_session: Session):
+    app_record = JobApplication(
+        company="Netflix",
+        title="Senior Platform Engineer",
+        status="applied",
+        job_url="https://netflix.jobs/123",
+    )
+    db_session.add(app_record)
+    db_session.commit()
+    db_session.refresh(app_record)
+
+    # Change status to cancelled
+    resp = client.post(
+        f"/applications/{app_record.id}/status",
+        data={"new_status": "cancelled", "note": "Position cancelled by company"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+
+    db_session.refresh(app_record)
+    assert app_record.status == "cancelled"
+
+    # Verify status change activity
+    act = (
+        db_session.query(ApplicationActivity)
+        .filter(ApplicationActivity.application_id == app_record.id)
+        .first()
+    )
+    assert act is not None
+    assert act.new_status == "cancelled"
+    assert "Position cancelled by company" in act.note
+
+    # Verify appearance in closed filter
+    resp_closed = client.get("/applications?status=closed")
+    assert resp_closed.status_code == 200
+    assert "Senior Platform Engineer" in resp_closed.text
+    assert "Netflix" in resp_closed.text
+
+    # Verify appearance on kanban board closed column with cancelled badge
+    resp_kanban = client.get("/applications?view=kanban")
+    assert resp_kanban.status_code == 200
+    assert "Senior Platform Engineer" in resp_kanban.text
+    assert "Cancelled" in resp_kanban.text
+
+    # Verify detail view has Cancelled step and btn-delete-app
+    resp_detail = client.get(f"/applications/{app_record.id}")
+    assert resp_detail.status_code == 200
+    assert "Cancelled" in resp_detail.text
+    assert "btn-delete-app" in resp_detail.text
+    assert "Open Original Posting ↗" in resp_detail.text
 
 
 def test_activities_logging(client: TestClient, db_session: Session):
