@@ -1,0 +1,299 @@
+{% extends "base.html" %} {% block content %}
+<div class="applications-dashboard">
+  <!-- Top Header & Action Row -->
+  <div class="dashboard-header">
+    <div>
+      <h2 style="margin: 0 0 0.25rem 0; font-size: 1.75rem;">Application Pipeline</h2>
+      <p class="section-subtitle" style="margin: 0;">
+        Manage your active submissions, track upcoming follow-ups, and review your job search
+        progress.
+      </p>
+    </div>
+
+    <div class="dashboard-actions">
+      <button
+        type="button"
+        class="btn-primary btn-log-external"
+        onclick="document.getElementById('manual-app-modal').showModal()"
+        title="Log a job applied to on external company sites or job boards"
+      >
+        <span>+ Log External Application</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Metric Overview Cards -->
+  <div class="metrics-grid">
+    <div class="metric-card glass-panel">
+      <div class="metric-label">Total Applications</div>
+      <div class="metric-value">{{ metrics.total }}</div>
+      <div class="metric-trend">All tracked jobs</div>
+    </div>
+    <div class="metric-card glass-panel">
+      <div class="metric-label">In Review / Applied</div>
+      <div class="metric-value">{{ metrics.applied }}</div>
+      <div class="metric-trend" style="color: var(--primary);">Awaiting response</div>
+    </div>
+    <div class="metric-card glass-panel">
+      <div class="metric-label">Interviewing</div>
+      <div class="metric-value">{{ metrics.interviewing + metrics.screening }}</div>
+      <div class="metric-trend" style="color: #f59e0b;">
+        {{ metrics.screening }} screen, {{ metrics.interviewing }} round
+      </div>
+    </div>
+    <div class="metric-card glass-panel">
+      <div class="metric-label">Offers Received</div>
+      <div class="metric-value" style="color: #10b981;">{{ metrics.offer }}</div>
+      <div class="metric-trend" style="color: #10b981;">Active offers</div>
+    </div>
+    <div class="metric-card glass-panel">
+      <div class="metric-label">Follow-ups Due</div>
+      <div class="metric-value {% if metrics.due_soon > 0 %}due-alert{% endif %}">
+        {{ metrics.due_soon }}
+      </div>
+      <div class="metric-trend">Overdue or due this week</div>
+    </div>
+  </div>
+
+  <!-- Controls Toolbar -->
+  <div class="applications-toolbar glass-panel" style="margin-top: 1.5rem; padding: 1rem 1.5rem;">
+    <form
+      id="tracker-filter-form"
+      hx-get="/applications"
+      hx-target="#applications-content"
+      hx-push-url="true"
+      hx-trigger="change, input delay:250ms from:#tracker-search"
+      style="display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; align-items: center;"
+    >
+      <input type="hidden" name="view" id="tracker-view-input" value="{{ current_view }}">
+
+      <!-- Search and Filter Left Group -->
+      <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; flex: 1; max-width: 650px;">
+        <input
+          type="text"
+          id="tracker-search"
+          name="q"
+          value="{{ q }}"
+          class="search-input"
+          placeholder="Search tracked applications by title, company, or location..."
+          style="min-width: 280px; flex: 1;"
+        >
+
+        <select name="status" class="filter-select" style="width: auto; min-width: 160px;">
+          {% for st_val, st_lbl in [('all', 'All Statuses'), ('saved', 'Saved / To Apply'),
+          ('applied', 'Applied'), ('screening', 'Phone Screen'), ('interviewing', 'Interviewing'),
+          ('offer', 'Offer'), ('closed', 'Closed / Archived')] %} {% if status_filter == st_val %}
+          <option value="{{ st_val }}" selected>{{ st_lbl }}</option>
+          {% else %}
+          <option value="{{ st_val }}">{{ st_lbl }}</option>
+          {% endif %} {% endfor %}
+        </select>
+      </div>
+
+      <!-- View Switcher Right Group -->
+      <div class="view-toggle-group">
+        <a
+          href="/applications?view=kanban{% if q %}&q={{ q }}{% endif %}{% if status_filter != 'all' %}&status={{ status_filter }}{% endif %}"
+          class="btn-toggle {% if current_view == 'kanban' %}active{% endif %}"
+          title="Kanban Board View"
+        >
+          <span>📊 Pipeline Board</span>
+        </a>
+        <a
+          href="/applications?view=table{% if q %}&q={{ q }}{% endif %}{% if status_filter != 'all' %}&status={{ status_filter }}{% endif %}"
+          class="btn-toggle {% if current_view == 'table' %}active{% endif %}"
+          title="Detailed Table View"
+        >
+          <span>📋 Table View</span>
+        </a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Applications Dynamic Content Container -->
+  <div id="applications-content" style="margin-top: 1.5rem;">
+    {% if current_view == 'table' %} {% include "partials/applications_table.html" %} {% else %} {%
+    include "partials/applications_kanban.html" %} {% endif %}
+  </div>
+</div>
+
+<!-- Manual Application Modal -->
+<dialog id="manual-app-modal" class="modal-dialog glass-panel">
+  <div class="modal-header">
+    <h3 style="margin: 0; font-size: 1.25rem;">Log External Job Application</h3>
+    <button
+      type="button"
+      class="btn-icon"
+      onclick="document.getElementById('manual-app-modal').close()"
+      title="Close modal"
+    >
+      ✕
+    </button>
+  </div>
+
+  <form method="post" action="/applications" class="modal-body" style="margin-top: 1rem;">
+    <div class="form-grid-2">
+      <div class="form-group">
+        <label for="manual-company">Company Name *</label>
+        <input
+          type="text"
+          id="manual-company"
+          name="company"
+          required
+          placeholder="e.g. Acme Health"
+        >
+      </div>
+      <div class="form-group">
+        <label for="manual-title">Job Title *</label>
+        <input
+          type="text"
+          id="manual-title"
+          name="title"
+          required
+          placeholder="e.g. Senior Software Engineer"
+        >
+      </div>
+    </div>
+
+    <div class="form-grid-2" style="margin-top: 0.75rem;">
+      <div class="form-group">
+        <label for="manual-location">Location</label>
+        <input
+          type="text"
+          id="manual-location"
+          name="location"
+          placeholder="e.g. Remote / New York, NY"
+        >
+      </div>
+      <div class="form-group">
+        <label for="manual-salary">Salary (Optional)</label>
+        <input
+          type="text"
+          id="manual-salary"
+          name="salary_stated"
+          placeholder="e.g. $130,000 - $150,000"
+        >
+      </div>
+    </div>
+
+    <div class="form-grid-2" style="margin-top: 0.75rem;">
+      <div class="form-group">
+        <label for="manual-method">Application Method *</label>
+        <select id="manual-method" name="method">
+          <option value="Company Website">Company Website / Careers Portal</option>
+          <option value="LinkedIn">LinkedIn</option>
+          <option value="Indeed">Indeed</option>
+          <option value="Referral">Referral / Networking</option>
+          <option value="Recruiter">Recruiter Outreach</option>
+          <option value="Job Fair">Job Fair / Conference</option>
+          <option value="Email">Direct Email</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="manual-status">Current Status</label>
+        <select id="manual-status" name="status">
+          <option value="applied" selected>Applied</option>
+          <option value="saved">Saved / Planning to Apply</option>
+          <option value="screening">Phone Screen</option>
+          <option value="interviewing">Interviewing</option>
+          <option value="offer">Offer Received</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-grid-2" style="margin-top: 0.75rem;">
+      <div class="form-group">
+        <label for="manual-applied-date">Date Applied</label>
+        <input
+          type="date"
+          id="manual-applied-date"
+          name="applied_date"
+          value="{{ today.strftime('%Y-%m-%d') }}"
+        >
+      </div>
+      <div class="form-group">
+        <label for="manual-follow-up-date">Follow-Up Reminder Date</label>
+        <input
+          type="date"
+          id="manual-follow-up-date"
+          name="follow_up_date"
+          value="{{ default_follow_up.strftime('%Y-%m-%d') }}"
+        >
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-top: 0.75rem;">
+      <label for="manual-url">Job Posting / Portal URL</label>
+      <input
+        type="url"
+        id="manual-url"
+        name="job_url"
+        placeholder="https://careers.company.com/job/123"
+      >
+    </div>
+
+    <!-- Portal Account Details -->
+    <div class="portal-box glass-panel" style="margin-top: 0.75rem; padding: 0.85rem;">
+      <label
+        class="checkbox-label"
+        for="manual-account-created"
+        style="display: flex; align-items: center; gap: 0.5rem;"
+      >
+        <input type="checkbox" id="manual-account-created" name="account_created" value="true">
+        <span style="font-weight: 500;"
+          >Created Applicant Portal Account (Workday, Taleo, etc.)</span
+        >
+      </label>
+      <div class="form-grid-2" style="margin-top: 0.5rem;">
+        <div class="form-group">
+          <label for="manual-portal-username" style="font-size: 0.8rem;"
+            >Portal Username / Email</label
+          >
+          <input
+            type="text"
+            id="manual-portal-username"
+            name="portal_username"
+            placeholder="user@gmail.com"
+          >
+        </div>
+        <div class="form-group">
+          <label for="manual-confirmation" style="font-size: 0.8rem;"
+            >Confirmation / App # (For Unemployment)</label
+          >
+          <input
+            type="text"
+            id="manual-confirmation"
+            name="confirmation_number"
+            placeholder="e.g. REQ-98421"
+          >
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-top: 0.75rem;">
+      <label for="manual-description">Job Description (Snapshot / Notes)</label>
+      <textarea
+        id="manual-description"
+        name="description"
+        rows="3"
+        placeholder="Paste key responsibilities or requirements..."
+      ></textarea>
+    </div>
+
+    <div
+      class="modal-footer"
+      style="margin-top: 1.25rem; display: flex; justify-content: flex-end; gap: 0.75rem;"
+    >
+      <button
+        type="button"
+        class="btn-secondary"
+        onclick="document.getElementById('manual-app-modal').close()"
+      >
+        Cancel
+      </button>
+      <button type="submit" class="btn-primary" style="width: auto;">Save Application</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}

@@ -63,6 +63,33 @@ set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
 
 ---
 
+## Application Tracking & Unemployment Compliance
+
+### Application Pipeline (`/applications`)
+* **1-Click Feed Tracking**: Track jobs directly from the curated feed with automatic follow-up dates (+14 days) and audit logging.
+* **Interactive Kanban Board**: Visual drag-and-drop workflow across 6 pipeline stages:
+  * `📌 Saved / To Apply`
+  * `✉️ Applied`
+  * `📞 Phone Screen`
+  * `💼 Interviewing`
+  * `🎉 Offer Received`
+  * `📁 Closed / Archived` (Rejected, Withdrawn, Cancelled)
+* **Detailed Table View**: Filterable table with quick stage dropdowns, contact counters, follow-up dates, and direct management links.
+* **Follow-Up Reminders**: Visual indicators for `Due Today`, `Overdue`, and `Upcoming` follow-ups.
+* **Application Detail Command Center (`/applications/{id}`)**:
+  * **Key Contacts**: 1-to-many relationship tracking recruiters, hiring managers, and internal referrals with email, phone, and LinkedIn URLs.
+  * **Activity Timeline**: Reverse-chronological audit log capturing status transitions, interview prep notes, and outreach.
+  * **Job Description Snapshot**: Manually editable snapshot preserving the original posting text even if the live posting expires.
+* **External Application Modal**: Log jobs applied to outside the feed (e.g. company careers portals, job fairs, direct emails).
+
+### Unemployment Work-Search Audit Log (`/applications/unemployment-report`)
+* **Weekly Claim Certification**: Automatically aggregates all application submissions, phone screens, interviews, and contacts into Saturday week-ending periods.
+* **Compliance Standards**: Highlights whether each claim period meets the standard 3+ work-search activities requirement with visual badges.
+* **Audit Documentation**: Captures applicant portal creation, portal usernames, and confirmation numbers as official proof for state unemployment audits.
+* **Export & Print**: Dedicated print-to-PDF stylesheet and instant CSV export for submitting weekly claims.
+
+---
+
 ## Code Quality & Verification Gates
 
 All code changes must pass the automated quality checks before merging back to `main`:

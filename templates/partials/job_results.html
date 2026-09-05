@@ -48,47 +48,7 @@
         {% endif %}
       </div>
 
-      <div class="actions-bar">
-        {% if job.job_url %}
-        <a
-          href="{{ job.job_url }}"
-          target="_blank"
-          class="btn-primary btn-small"
-          style="text-decoration: none; text-align: center;"
-          >Apply Here</a
-        >
-        {% endif %}
-        <button
-          type="button"
-          class="btn-secondary btn-small"
-          hx-get="/job/{{ job.id }}"
-          hx-target="#job-details-{{ job.id }}"
-          hx-swap="innerHTML"
-        >
-          View Details
-        </button>
-        {% if job.is_hidden %}
-        <button
-          type="button"
-          class="btn-secondary btn-small"
-          hx-post="/job/{{ job.id }}/unhide"
-          hx-target="#job-{{ job.id }}"
-          hx-swap="outerHTML"
-        >
-          Unhide
-        </button>
-        {% else %}
-        <button
-          type="button"
-          class="btn-secondary btn-small"
-          hx-post="/job/{{ job.id }}/hide"
-          hx-target="#job-{{ job.id }}"
-          hx-swap="outerHTML"
-        >
-          Hide
-        </button>
-        {% endif %}
-      </div>
+      {% include "partials/job_actions.html" %}
 
       <div id="job-details-{{ job.id }}"></div>
     </div>
@@ -134,47 +94,7 @@
     {% endif %}
   </div>
 
-  <div class="actions-bar">
-    {% if job.job_url %}
-    <a
-      href="{{ job.job_url }}"
-      target="_blank"
-      class="btn-primary btn-small"
-      style="text-decoration: none; text-align: center;"
-      >Apply Here</a
-    >
-    {% endif %}
-    <button
-      type="button"
-      class="btn-secondary btn-small"
-      hx-get="/job/{{ job.id }}"
-      hx-target="#job-details-{{ job.id }}"
-      hx-swap="innerHTML"
-    >
-      View Details
-    </button>
-    {% if job.is_hidden %}
-    <button
-      type="button"
-      class="btn-secondary btn-small"
-      hx-post="/job/{{ job.id }}/unhide"
-      hx-target="#job-{{ job.id }}"
-      hx-swap="outerHTML"
-    >
-      Unhide
-    </button>
-    {% else %}
-    <button
-      type="button"
-      class="btn-secondary btn-small"
-      hx-post="/job/{{ job.id }}/hide"
-      hx-target="#job-{{ job.id }}"
-      hx-swap="outerHTML"
-    >
-      Hide
-    </button>
-    {% endif %}
-  </div>
+  {% include "partials/job_actions.html" %}
 
   <div id="job-details-{{ job.id }}"></div>
 </div>

@@ -1,7 +1,7 @@
 import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
 
@@ -49,3 +49,104 @@ class SavedJob(Base):
     saved_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=lambda: datetime.datetime.now(datetime.UTC)
     )
+
+    applications: Mapped[list[JobApplication]] = relationship(
+        back_populates="saved_job", cascade="all, delete-orphan"
+    )
+
+
+class JobApplication(Base):
+    """Tracks personal application progress, follow-ups, and unemployment compliance details."""
+
+    __tablename__ = "job_applications"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    saved_job_id: Mapped[int | None] = mapped_column(
+        ForeignKey("saved_jobs.id", ondelete="SET NULL"), nullable=True, default=None, index=True
+    )
+    title: Mapped[str] = mapped_column(String, default="")
+    company: Mapped[str] = mapped_column(String, default="", index=True)
+    location: Mapped[str] = mapped_column(String, default="")
+    salary_stated: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    job_url: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+
+    # Status: saved, applied, screening, interviewing, offer, rejected, withdrawn, cancelled
+    status: Mapped[str] = mapped_column(String, default="applied", index=True)
+    applied_date: Mapped[datetime.date | None] = mapped_column(Date, nullable=True, default=None)
+    method: Mapped[str] = mapped_column(String, default="Company Website")
+
+    # Portal Account Tracking
+    account_created: Mapped[bool] = mapped_column(Boolean, default=False)
+    portal_username: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+
+    # Unemployment proof & follow up
+    confirmation_number: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    follow_up_date: Mapped[datetime.date | None] = mapped_column(Date, nullable=True, default=None)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=lambda: datetime.datetime.now(datetime.UTC)
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.datetime.now(datetime.UTC),
+        onupdate=lambda: datetime.datetime.now(datetime.UTC),
+    )
+
+    saved_job: Mapped[SavedJob | None] = relationship(back_populates="applications")
+    contacts: Mapped[list[ApplicationContact]] = relationship(
+        back_populates="application",
+        cascade="all, delete-orphan",
+        order_by="ApplicationContact.id.asc()",
+    )
+    activities: Mapped[list[ApplicationActivity]] = relationship(
+        back_populates="application",
+        cascade="all, delete-orphan",
+        order_by="ApplicationActivity.created_at.desc()",
+    )
+
+
+class ApplicationContact(Base):
+    """Tracks multiple contacts (e.g. Hiring Manager, Recruiter, Referral) for an application."""
+
+    __tablename__ = "application_contacts"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    application_id: Mapped[int] = mapped_column(
+        ForeignKey("job_applications.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String, default="")
+    role: Mapped[str] = mapped_column(String, default="Hiring Manager")
+    email: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    phone: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    linkedin_url: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=lambda: datetime.datetime.now(datetime.UTC)
+    )
+
+    application: Mapped[JobApplication] = relationship(back_populates="contacts")
+
+
+class ApplicationActivity(Base):
+    """Audit timeline of status changes, notes, interviews, and follow-ups over time."""
+
+    __tablename__ = "application_activities"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    application_id: Mapped[int] = mapped_column(
+        ForeignKey("job_applications.id", ondelete="CASCADE"), index=True
+    )
+    activity_type: Mapped[str] = mapped_column(String, default="status_change")
+    old_status: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    new_status: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    note: Mapped[str] = mapped_column(Text, default="")
+    activity_date: Mapped[datetime.date] = mapped_column(
+        Date, default=lambda: datetime.datetime.now(datetime.UTC).date()
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=lambda: datetime.datetime.now(datetime.UTC)
+    )
+
+    application: Mapped[JobApplication] = relationship(back_populates="activities")

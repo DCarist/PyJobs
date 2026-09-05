@@ -1,0 +1,44 @@
+<div class="timeline" id="activity-timeline">
+  {% if activities %} {% for act in activities %}
+  <div class="timeline-item">
+    <div class="timeline-marker marker-{{ act.activity_type }}"></div>
+    <div class="timeline-content glass-panel">
+      <div class="timeline-header">
+        <span class="timeline-type">
+          {% if act.activity_type == 'status_change' %} 🔄 Status Changed {% elif act.activity_type
+          == 'interview' %} 💼 Interview Note {% elif act.activity_type == 'contact' %} 👤 Contact
+          Recorded {% elif act.activity_type == 'follow_up' %} ⏰ Follow-up Logged {% else %} 📝
+          Note Added {% endif %}
+        </span>
+        <span class="timeline-date">
+          {{ act.activity_date.strftime('%b %d, %Y') if act.activity_date else
+          act.created_at.strftime('%b %d, %Y') }}
+        </span>
+      </div>
+
+      {% if act.activity_type == 'status_change' and act.new_status %}
+      <div class="timeline-status-transition">
+        {% if act.old_status %}
+        <span class="badge stage-badge stage-{{ act.old_status }}"
+          >{{ act.old_status|capitalize }}</span
+        >
+        <span class="transition-arrow">→</span>
+        {% endif %}
+        <span class="badge stage-badge stage-{{ act.new_status }}"
+          >{{ act.new_status|capitalize }}</span
+        >
+      </div>
+      {% endif %} {% if act.note %}
+      <p class="timeline-note">{{ act.note }}</p>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %} {% else %}
+  <div class="empty-timeline">
+    <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">
+      No activity logged yet. Status transitions, notes, and interviews will appear here in
+      chronological order.
+    </p>
+  </div>
+  {% endif %}
+</div>
