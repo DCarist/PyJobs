@@ -456,3 +456,20 @@ def test_delete_application(client: TestClient, db_session: Session):
 
     deleted = db_session.query(JobApplication).filter(JobApplication.id == app_record.id).first()
     assert deleted is None
+
+
+def test_seed_script_populates_pipeline_and_contacts(db_session: Session):
+    from unittest.mock import patch
+
+    from scripts.seed import seed
+
+    with patch("scripts.seed.SessionLocal", return_value=db_session), patch("scripts.seed.init_db"):
+        seed()
+        assert db_session.query(SavedJob).count() == 3
+        assert db_session.query(JobApplication).count() == 3
+        assert db_session.query(ApplicationContact).count() == 2
+        assert db_session.query(ApplicationActivity).count() == 5
+
+        # Verify idempotency on second run
+        seed()
+        assert db_session.query(JobApplication).count() == 3
