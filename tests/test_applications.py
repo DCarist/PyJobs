@@ -142,6 +142,11 @@ def test_applications_dashboard_views(client: TestClient, db_session: Session):
     assert "Frontend Architect" in resp_kanban.text
     assert "Site Reliability" in resp_kanban.text
     assert "Pipeline Board" in resp_kanban.text
+    assert 'draggable="true"' in resp_kanban.text
+    assert f'data-app-id="{app1.id}"' in resp_kanban.text
+    assert 'data-stage="interviewing"' in resp_kanban.text
+    assert f"/applications/{app1.id}" in resp_kanban.text
+    assert "+ Log External Application" in resp_kanban.text
 
     # Table View
     resp_table = client.get("/applications?view=table")
@@ -154,6 +159,25 @@ def test_applications_dashboard_views(client: TestClient, db_session: Session):
     assert resp_filter.status_code == 200
     assert "Anthropic" in resp_filter.text
     assert "Google" not in resp_filter.text
+
+
+def test_kanban_drag_drop_status_update_with_hx_target(client: TestClient, db_session: Session):
+    app_record = JobApplication(company="Figma", title="Product Designer", status="applied")
+    db_session.add(app_record)
+    db_session.commit()
+    db_session.refresh(app_record)
+
+    resp = client.post(
+        f"/applications/{app_record.id}/status?view=kanban",
+        data={"new_status": "interviewing"},
+        headers={"HX-Target": "applications-content"},
+    )
+    assert resp.status_code == 200
+    assert "Product Designer" in resp.text
+    assert 'data-stage="interviewing"' in resp.text
+
+    db_session.refresh(app_record)
+    assert app_record.status == "interviewing"
 
 
 def test_application_detail_command_center(client: TestClient, db_session: Session):

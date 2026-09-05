@@ -1,6 +1,6 @@
 <div class="kanban-board" id="kanban-board">
   {% for col in kanban_columns %}
-  <div class="kanban-column" id="column-{{ col.id }}">
+  <div class="kanban-column" id="column-{{ col.id }}" data-stage="{{ col.id }}">
     <div class="kanban-column-header {{ col.badge_class }}">
       <div class="column-title-group">
         <span class="column-icon">{{ col.icon }}</span>
@@ -9,9 +9,15 @@
       <span class="badge column-count">{{ col.cards|length }}</span>
     </div>
 
-    <div class="kanban-cards-list">
+    <div class="kanban-cards-list" data-stage="{{ col.id }}">
       {% if col.cards %} {% for app in col.cards %}
-      <div class="kanban-card glass-panel" id="app-card-{{ app.id }}">
+      <div
+        class="kanban-card glass-panel"
+        id="app-card-{{ app.id }}"
+        draggable="true"
+        data-app-id="{{ app.id }}"
+        data-current-stage="{{ col.id }}"
+      >
         <div class="kanban-card-top">
           <a href="/applications/{{ app.id }}" class="kanban-card-title">
             {{ app.title or "Untitled Role" }}
@@ -40,50 +46,12 @@
         >
           <span class="follow-up-icon">⏰</span>
           <span class="follow-up-text">
-            {% if today > app.follow_up_date %} Follow-up Overdue ({{
-            app.follow_up_date.strftime('%b %d') }}) {% elif app.follow_up_date == today %}
-            Follow-up Due Today! {% else %} Follow-up: {{ app.follow_up_date.strftime('%b %d') }} {%
-            endif %}
+            {% if today > app.follow_up_date %} Overdue ({{ app.follow_up_date.strftime('%b %d') }})
+            {% elif app.follow_up_date == today %} Due Today! {% else %} {{
+            app.follow_up_date.strftime('%b %d') }} {% endif %}
           </span>
         </div>
         {% endif %}
-
-        <div class="kanban-card-actions">
-          <!-- Stage Mover Selector -->
-          <form
-            hx-post="/applications/{{ app.id }}/status"
-            hx-target="#applications-content"
-            hx-swap="innerHTML"
-            class="quick-status-form"
-          >
-            <label for="status-select-{{ app.id }}" class="sr-only">Move Stage</label>
-            <select
-              id="status-select-{{ app.id }}"
-              name="new_status"
-              class="quick-stage-select"
-              hx-post="/applications/{{ app.id }}/status"
-              hx-target="#applications-content"
-              hx-swap="innerHTML"
-              hx-trigger="change"
-            >
-              {% for st_val, st_lbl in [('saved', 'Saved'), ('applied', 'Applied'), ('screening',
-              'Screening'), ('interviewing', 'Interviewing'), ('offer', 'Offer'), ('rejected',
-              'Rejected'), ('withdrawn', 'Withdrawn')] %} {% if app.status == st_val %}
-              <option value="{{ st_val }}" selected>{{ st_lbl }}</option>
-              {% else %}
-              <option value="{{ st_val }}">{{ st_lbl }}</option>
-              {% endif %} {% endfor %}
-            </select>
-          </form>
-
-          <a
-            href="/applications/{{ app.id }}"
-            class="btn-secondary btn-tiny"
-            title="Open Follow-up Command Center"
-          >
-            Manage →
-          </a>
-        </div>
       </div>
       {% endfor %} {% else %}
       <div class="empty-column-placeholder">

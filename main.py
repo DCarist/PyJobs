@@ -773,7 +773,10 @@ async def update_application_status(
         db.commit()
 
     if request.headers.get("HX-Target") == "applications-content":
-        return await applications_dashboard(request=request, view="kanban", db=db)
+        view = request.query_params.get("view", "kanban")
+        q = request.query_params.get("q", "")
+        status = request.query_params.get("status", "all")
+        return await applications_dashboard(request=request, view=view, q=q, status=status, db=db)
 
     return RedirectResponse(url=f"/applications/{id}", status_code=303)
 
