@@ -1,0 +1,16 @@
+{
+  "pyjobs-quality-checks": {
+    "PostToolUse": [
+      {
+        "matcher": "replace_file_content|multi_replace_file_content|write_to_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import pathlib, subprocess, sys; p = [x for x in [pathlib.Path('scripts/hook_post_tool.py'), pathlib.Path('../scripts/hook_post_tool.py')] if x.exists()][0]; sys.exit(subprocess.call([sys.executable, str(p)]))\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -2,6 +2,14 @@
 
 This repository follows a strict pair-programming workflow for feature development, testing, quality assurance, and commits. Every code modification must adhere to the 6-step cycle below.
 
+Modular, domain-specific rules are located in [.agents/rules/](file:///d:/Programming/PyJobs/.agents/rules/):
+* [01-workflow.md](file:///d:/Programming/PyJobs/.agents/rules/01-workflow.md): Workflow sequence, branching strategy, and branch completion audit.
+* [02-python-backend.md](file:///d:/Programming/PyJobs/.agents/rules/02-python-backend.md): Modern Python 3.14+, SQLAlchemy 2.0 type mapping, FastAPI, and scraper safety.
+* [03-frontend-ui.md](file:///d:/Programming/PyJobs/.agents/rules/03-frontend-ui.md): Vanilla CSS, HTMX partials, dark-mode glassmorphic aesthetics, accessibility.
+* [04-testing-quality.md](file:///d:/Programming/PyJobs/.agents/rules/04-testing-quality.md): Hermetic in-memory tests, sub-second execution, quality gate checks.
+
+Lifecycle hooks are configured in [.agents/hooks.json](file:///d:/Programming/PyJobs/.agents/hooks.json) to automatically run formatting, lint fixes, and type checks on every file modification.
+
 ---
 
 ## The 6-Step Development Cycle
@@ -48,11 +56,14 @@ Or verify individual components:
 
 **All checks must pass with 0 errors before proceeding.**
 
-### 5. Prepare Commit Message
-Generate a clean conventional commit message with:
-* Conventional prefix (`feat:`, `fix:`, `refactor:`, `test:`, `chore:`).
-* A concise imperative summary line.
-* Bulleted description of changes, tests added, and quality validations.
+### 5. Prepare Commit Message & Rule Alignment
+* Generate a clean conventional commit message with:
+  * Conventional prefix (`feat:`, `fix:`, `refactor:`, `test:`, `chore:`).
+  * A concise imperative summary line.
+  * Bulleted description of changes, tests added, and quality validations.
+* **Branch Completion: Rule & Documentation Alignment Check**:
+  * Before concluding a development branch, verify that any new dependencies, architectural patterns, database models, or tools are reflected in `.agents/rules/`, `AGENTS.md`, and `README.md`.
+  * Keep rules and documentation aligned with current project reality.
 
 ### 6. User Review & Authorization (MANDATORY STOP)
 * Present the summary of changes, test results, and proposed commit message to the user.

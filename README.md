@@ -112,6 +112,10 @@ To check only staged files (used by the pre-commit hook):
 powershell -ExecutionPolicy Bypass -File ./scripts/check.ps1 -Staged
 ```
 
+### Agent Lifecycle Hooks & Modular Rules
+* **PostToolUse Hook (`.agents/hooks.json`)**: Automatically auto-fixes formatting (Ruff, Biome) and validates types (Ty) whenever an AI agent modifies code via `scripts/hook_post_tool.py`.
+* **Modular Project Rules (`.agents/rules/`)**: Scoped rules covering workflow conventions, Python backend standards, HTMX frontend best practices, and branch-completion audits.
+
 ---
 
 ## Git Workflow & Feature Branches
