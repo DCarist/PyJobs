@@ -1,6 +1,6 @@
 import datetime
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -15,6 +15,56 @@ class UserPreference(Base):
     fields: Mapped[str] = mapped_column(String, default="")  # comma separated
     sites: Mapped[str] = mapped_column(String, default="linkedin,indeed,google")
     is_remote: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class SearchProfile(Base):
+    """Represents a named multi-query search profile with custom filters and schedules."""
+
+    __tablename__ = "search_profiles"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String, default="Default Search", index=True)
+    positions: Mapped[str] = mapped_column(String, default="")  # comma separated
+    fields: Mapped[str] = mapped_column(String, default="")  # comma separated
+    location: Mapped[str] = mapped_column(String, default="")
+    sites: Mapped[str] = mapped_column(String, default="linkedin,indeed,google")
+    is_remote: Mapped[bool] = mapped_column(Boolean, default=False)
+    distance_miles: Mapped[int] = mapped_column(Integer, default=50)
+    results_wanted: Mapped[int] = mapped_column(Integer, default=25)
+    date_range_days: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+
+    # Automated Scheduling
+    refresh_interval_hours: Mapped[int] = mapped_column(Integer, default=0)  # 0 = manual only
+    refresh_on_launch: Mapped[bool] = mapped_column(Boolean, default=False)
+    last_scraped_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime, nullable=True, default=None
+    )
+
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=lambda: datetime.datetime.now(datetime.UTC)
+    )
+
+    jobs: Mapped[list[SavedJob]] = relationship(
+        secondary="job_search_profiles",
+        back_populates="search_profiles",
+    )
+
+
+class JobSearchProfile(Base):
+    """Many-to-many relationship tracking which search profiles discovered a saved job."""
+
+    __tablename__ = "job_search_profiles"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    saved_job_id: Mapped[int] = mapped_column(
+        ForeignKey("saved_jobs.id", ondelete="CASCADE"), index=True
+    )
+    search_profile_id: Mapped[int] = mapped_column(
+        ForeignKey("search_profiles.id", ondelete="CASCADE"), index=True
+    )
+    discovered_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=lambda: datetime.datetime.now(datetime.UTC)
+    )
 
 
 class SavedJob(Base):
@@ -46,12 +96,21 @@ class SavedJob(Base):
         DateTime, nullable=True, default=None
     )
     is_hidden: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_stale: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_link_dead: Mapped[bool] = mapped_column(Boolean, default=False)
+    last_verified_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime, nullable=True, default=None
+    )
     saved_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=lambda: datetime.datetime.now(datetime.UTC)
     )
 
     applications: Mapped[list[JobApplication]] = relationship(
         back_populates="saved_job", cascade="all, delete-orphan"
+    )
+    search_profiles: Mapped[list[SearchProfile]] = relationship(
+        secondary="job_search_profiles",
+        back_populates="jobs",
     )
 
 

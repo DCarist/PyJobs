@@ -33,7 +33,9 @@ Guidelines and constraints for all backend code in PyJobs.
 * Route handlers should be grouped logically into routers (`api_router`, `views_router`, etc.).
 * Validate all request inputs using Pydantic schemas or standard FastAPI parameters.
 * Return appropriate HTTP status codes (e.g. `201 Created`, `404 Not Found`, `422 Unprocessable Entity`).
-* Ensure background tasks and scraping operations do not block the event loop.
+* Ensure background tasks and scraping operations do not block the event loop (run in worker threads via `asyncio.to_thread`).
+* Retrieve session factories for background tasks dynamically via `getattr(request.app.state, "session_factory", SessionLocal)` to support in-memory test isolation.
+* Background workers and the recurring scheduler loop must check `os.environ.get("PYJOBS_TESTING")` to prevent unmanaged background threads or network calls during test suites.
 
 ---
 

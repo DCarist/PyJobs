@@ -63,6 +63,40 @@ set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
 
 ---
 
+## Search Profiles & Async Ingestion
+
+### Multi-Query Search Profiles (`/profiles`)
+* **Targeted Query Management**: Save independent search profiles with customized parameters:
+  * Profile Name, Position Titles, and Required Skills/Fields.
+  * Geographic Location, Search Radius (miles), and Remote Toggle.
+  * Target Job Boards (`linkedin`, `indeed`, `google`, `zip_recruiter`, `glassdoor`).
+  * Desired Result Count & Max Posting Age (days).
+* **Sidebar Profile Switcher**: Switch active profiles seamlessly or create new profiles directly in the dashboard sidebar.
+* **Feed Filtering by Profile**: Filter the main jobs feed to inspect opportunities discovered by specific profiles or view all aggregated jobs.
+
+### Asynchronous Scraping & Live Progress (`/scrape/start`, `/scrape/status/{task_id}`)
+* **Non-Blocking Execution**: Scrapes run asynchronously in background worker threads without freezing the UI or HTTP server.
+* **Live Progress Tracking**: HTMX polling indicator displays real-time progress percentages and status updates.
+* **4-Pillar Metric Summary**: Completion feedback highlighting:
+  * **Newly Added**: Fresh job postings inserted into SQLite.
+  * **Metadata Refreshed**: Postings re-encountered with updated salaries or descriptions.
+  * **Aging (30d+)**: Postings that have passed the staleness threshold.
+  * **Hidden Postings**: Postings currently filtered out or auto-hidden.
+* **Instant Feed Refresh**: Out-of-band DOM swap immediately updates the job results view upon scrape completion.
+
+### Automated Scheduling & Background Refresh
+* **Per-Profile Intervals**: Configure automated background refreshes every 1, 6, 12, or 24 hours.
+* **Launch Check**: Mark profiles to scrape immediately on application launch (`refresh_on_launch`).
+* **In-App Scheduler**: Lightweight asyncio lifespan scheduler checks eligible profiles without requiring external cron daemons.
+
+### Posting Staleness & Expiration Management
+* **Age-Based Staleness Badge**: Postings 30+ days old automatically display an amber `Stale (30d+)` badge.
+* **Dead Link Verification**: Postings verified as dead/404 via HTTP `HEAD` checks show a red `Dead Link` warning.
+* **1-Click Bulk Auto-Hide**: Hide all stale postings with a single click to keep your active pipeline clean.
+* **Active vs. Stale Filtering**: Main feed filters allow viewing `All Postings`, `Active Only`, or `Stale Only`.
+
+---
+
 ## Application Tracking & Unemployment Compliance
 
 ### Application Pipeline (`/applications`)

@@ -1808,3 +1808,65 @@ details[open] > summary.group-summary .group-chevron {
     color: #111827;
   }
 }
+
+/* ==============================================================================
+   Async Scrape Progress & Status Indicators
+   ============================================================================== */
+.scrape-progress-widget {
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+  border-left: 4px solid var(--primary);
+}
+
+.scrape-progress-widget.status-completed {
+  border-left-color: var(--success);
+}
+
+.scrape-progress-widget.status-failed {
+  border-left-color: var(--danger);
+}
+
+.scrape-progress-widget.status-running,
+.scrape-progress-widget.status-pending {
+  border-left-color: var(--primary);
+}
+
+.badge.stale-badge {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge.dead-link-badge {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.badge.profile-badge {
+  background: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+/* ==============================================================================
+   Modal Dialog & Glassmorphic Backdrop Styles
+   ============================================================================== */
+dialog.modal-dialog {
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  background: #1e293b;
+  color: var(--text-primary);
+  max-width: 480px;
+  width: 90%;
+  padding: 1.5rem;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6);
+  margin: auto;
+}
+
+dialog.modal-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}

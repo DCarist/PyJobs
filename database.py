@@ -1,3 +1,5 @@
+import datetime
+
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -58,6 +60,15 @@ def init_db() -> None:
                     ),
                 ),
                 ("is_hidden", "ALTER TABLE saved_jobs ADD COLUMN is_hidden BOOLEAN DEFAULT 0"),
+                ("is_stale", "ALTER TABLE saved_jobs ADD COLUMN is_stale BOOLEAN DEFAULT 0"),
+                (
+                    "is_link_dead",
+                    "ALTER TABLE saved_jobs ADD COLUMN is_link_dead BOOLEAN DEFAULT 0",
+                ),
+                (
+                    "last_verified_at",
+                    "ALTER TABLE saved_jobs ADD COLUMN last_verified_at DATETIME DEFAULT NULL",
+                ),
             ]
             for col_name, sql_stmt in column_defs:
                 if col_name not in job_columns:
@@ -90,6 +101,42 @@ def init_db() -> None:
             for col_name, sql_stmt in app_defs:
                 if col_name not in app_columns:
                     conn.execute(text(sql_stmt))
+
+        # 4. Search profiles initial seed migration from user_preferences
+        if "search_profiles" in tables and "user_preferences" in tables:
+            profile_count = conn.execute(text("SELECT COUNT(*) FROM search_profiles")).scalar()
+            if profile_count == 0:
+                pref_row = (
+                    conn.execute(
+                        text(
+                            "SELECT location, positions, fields, sites, is_remote "
+                            "FROM user_preferences LIMIT 1"
+                        )
+                    )
+                    .mappings()
+                    .first()
+                )
+                if pref_row and (pref_row["positions"] or pref_row["location"]):
+                    now_utc = datetime.datetime.now(datetime.UTC)
+                    conn.execute(
+                        text(
+                            "INSERT INTO search_profiles "
+                            "(name, positions, fields, location, sites, is_remote, "
+                            "distance_miles, results_wanted, refresh_interval_hours, "
+                            "refresh_on_launch, created_at) "
+                            "VALUES (:name, :positions, :fields, :location, :sites, :is_remote, "
+                            "50, 25, 0, 0, :created_at)"
+                        ),
+                        {
+                            "name": "Primary Search",
+                            "positions": pref_row["positions"] or "",
+                            "fields": pref_row["fields"] or "",
+                            "location": pref_row["location"] or "",
+                            "sites": pref_row["sites"] or "linkedin,indeed,google",
+                            "is_remote": bool(pref_row["is_remote"]),
+                            "created_at": now_utc,
+                        },
+                    )
 
         conn.commit()
 

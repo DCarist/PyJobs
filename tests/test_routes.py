@@ -7,7 +7,7 @@ def test_index_page(client):
     response = client.get("/")
     assert response.status_code == 200
     assert "PyJobs" in response.text
-    assert "Search Preferences" in response.text
+    assert "Search Profile" in response.text
 
 
 def test_save_preferences(client, db_session):

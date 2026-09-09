@@ -1,0 +1,142 @@
+<div class="scrape-progress-widget glass-panel status-{{ task.status }}">
+  {% if task.status in ['pending', 'running'] %}
+  <!-- Active Task Poller -->
+  <div
+    hx-get="/scrape/status/{{ task.task_id }}"
+    hx-trigger="load delay:1500ms"
+    hx-target="#scrape-progress-container"
+    hx-swap="innerHTML"
+  >
+    <div
+      style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;"
+    >
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <div
+          class="loader"
+          style="display: inline-block; width: 1.25rem; height: 1.25rem; border-width: 2px;"
+        ></div>
+        <div>
+          <strong style="color: var(--text-primary); font-size: 0.95rem;"
+            >Scraping in progress: {{ task.profile_name }}</strong
+          >
+          <p style="margin: 0.2rem 0 0 0; color: var(--text-secondary); font-size: 0.85rem;">
+            {{ task.progress_message }}
+          </p>
+        </div>
+      </div>
+      <span style="font-weight: 700; color: var(--primary); font-size: 1rem;"
+        >{{ task.progress_percent }}%</span
+      >
+    </div>
+
+    <!-- Progress Bar Track -->
+    <div
+      style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 999px; overflow: hidden;"
+    >
+      <div
+        style="width: {{ task.progress_percent }}%; height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); transition: width 0.4s ease-in-out;"
+      ></div>
+    </div>
+  </div>
+
+  {% elif task.status == 'completed' %}
+  <!-- Completed Metrics Card -->
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;">
+    <div style="flex: 1;">
+      <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem;">
+        <span style="font-size: 1.2rem;">&#127881;</span>
+        <strong style="color: var(--success); font-size: 1rem;"
+          >Scrape Completed: {{ task.profile_name }}</strong
+        >
+        <span style="color: var(--text-secondary); font-size: 0.8rem;"
+          >(Finished at {{ task.completed_at.strftime('%H:%M:%S UTC') if task.completed_at else ''
+          }})</span
+        >
+      </div>
+
+      <!-- 4-Pillar Metrics Grid -->
+      <div
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem; margin-top: 0.75rem;"
+      >
+        <div
+          style="padding: 0.6rem 0.8rem; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px;"
+        >
+          <span
+            style="display: block; font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;"
+            >Newly Added</span
+          >
+          <strong style="font-size: 1.25rem; color: var(--success);">+{{ task.jobs_added }}</strong>
+        </div>
+
+        <div
+          style="padding: 0.6rem 0.8rem; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px;"
+        >
+          <span
+            style="display: block; font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;"
+            >Metadata Refreshed</span
+          >
+          <strong style="font-size: 1.25rem; color: var(--primary);"
+            >{{ task.jobs_updated }}</strong
+          >
+        </div>
+
+        <div
+          style="padding: 0.6rem 0.8rem; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px;"
+        >
+          <span
+            style="display: block; font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;"
+            >Aging / Stale (30d+)</span
+          >
+          <strong style="font-size: 1.25rem; color: #f59e0b;">{{ task.jobs_aging }}</strong>
+        </div>
+
+        <div
+          style="padding: 0.6rem 0.8rem; background: rgba(148, 163, 184, 0.12); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 8px;"
+        >
+          <span
+            style="display: block; font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;"
+            >Hidden Postings</span
+          >
+          <strong style="font-size: 1.25rem; color: var(--text-secondary);"
+            >{{ task.jobs_hidden }}</strong
+          >
+        </div>
+      </div>
+    </div>
+
+    <!-- Dismiss button -->
+    <button
+      type="button"
+      onclick="this.closest('.scrape-progress-widget').remove()"
+      style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.1rem; padding: 0.2rem 0.5rem;"
+      title="Dismiss notification"
+    >
+      &times;
+    </button>
+  </div>
+
+  <!-- Out-of-band update for the active job feed -->
+  {% if jobs is defined %}
+  <div id="job-results" hx-swap-oob="true">{% include "partials/job_results.html" %}</div>
+  {% endif %} {% elif task.status == 'failed' %}
+  <!-- Failure Notification -->
+  <div style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <strong style="color: var(--danger); font-size: 0.95rem;"
+        >Scrape Failed for {{ task.profile_name }}</strong
+      >
+      <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary); font-size: 0.85rem;">
+        {{ task.error_message or "An unexpected network or scraping error occurred." }}
+      </p>
+    </div>
+    <button
+      type="button"
+      onclick="this.closest('.scrape-progress-widget').remove()"
+      style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.1rem; padding: 0.2rem 0.5rem;"
+      title="Dismiss notification"
+    >
+      &times;
+    </button>
+  </div>
+  {% endif %}
+</div>

@@ -158,3 +158,121 @@ window.closeJobDetails = (jobId) => {
     }
   });
 })();
+
+// ==============================================================================
+// Search Profile Form Dirtiness Tracking & Scrape Modal Controller
+// ==============================================================================
+window.initProfileFormState = () => {
+  const form = document.getElementById("profile-form");
+  if (!form) return;
+  const formData = new FormData(form);
+  const params = new URLSearchParams();
+  for (const [k, v] of formData.entries()) {
+    if (typeof v === "string") {
+      params.append(k, v);
+    }
+  }
+  form.dataset.initialState = params.toString();
+};
+
+window.isProfileFormDirty = () => {
+  const form = document.getElementById("profile-form");
+  if (!form?.dataset.initialState) return false;
+  const formData = new FormData(form);
+  const params = new URLSearchParams();
+  for (const [k, v] of formData.entries()) {
+    if (typeof v === "string") {
+      params.append(k, v);
+    }
+  }
+  return params.toString() !== form.dataset.initialState;
+};
+
+window.triggerProfileScrape = (profileId) => {
+  const target = document.getElementById("scrape-progress-container");
+  if (window.htmx && target) {
+    window.htmx.ajax("POST", `/scrape/start?profile_id=${profileId}`, target);
+  }
+};
+
+window.handleProfileScrape = (profileId) => {
+  if (window.isProfileFormDirty()) {
+    const modal = document.getElementById("unsaved-profile-modal");
+    if (modal) {
+      modal.showModal();
+      return;
+    }
+  }
+  window.triggerProfileScrape(profileId);
+};
+
+window.scrapeWithoutSaving = (profileId) => {
+  const modal = document.getElementById("unsaved-profile-modal");
+  if (modal) modal.close();
+  window.triggerProfileScrape(profileId);
+};
+
+window.saveAndScrapeProfile = (profileId) => {
+  const modal = document.getElementById("unsaved-profile-modal");
+  if (modal) modal.close();
+
+  const form = document.getElementById("profile-form");
+  if (!form) {
+    window.triggerProfileScrape(profileId);
+    return;
+  }
+
+  const actionUrl = form.getAttribute("action") || `/profiles/${profileId}`;
+  const formData = new FormData(form);
+
+  fetch(actionUrl, {
+    method: "POST",
+    body: formData,
+  })
+    .then((res) => {
+      if (!res.ok) throw new Error("Failed to save profile");
+      return res.text();
+    })
+    .then((html) => {
+      const container = document.getElementById("profile-sidebar-container");
+      if (container) {
+        container.innerHTML = html;
+        if (window.htmx) window.htmx.process(container);
+      }
+      window.initProfileFormState();
+      window.triggerProfileScrape(profileId);
+    })
+    .catch((err) => {
+      console.error("Error saving profile before scrape:", err);
+      window.triggerProfileScrape(profileId);
+    });
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+  window.initProfileFormState();
+});
+
+document.addEventListener("htmx:afterSwap", (evt) => {
+  if (
+    evt.detail &&
+    (evt.detail.target.id === "profile-sidebar-container" ||
+      evt.detail.target.closest?.("#profile-sidebar-container"))
+  ) {
+    window.initProfileFormState();
+  }
+});
+
+document.addEventListener("click", (e) => {
+  const modal = document.getElementById("unsaved-profile-modal");
+  if (modal?.open && e.target === modal) {
+    const rect = modal.getBoundingClientRect();
+    const isInDialog =
+      rect.top <= e.clientY &&
+      e.clientY <= rect.top + rect.height &&
+      rect.left <= e.clientX &&
+      e.clientX <= rect.left + rect.width;
+    if (!isInDialog) {
+      modal.close();
+    }
+  }
+});

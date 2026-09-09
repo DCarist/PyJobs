@@ -2,7 +2,8 @@ import datetime
 import io
 import os
 import re
-from typing import TypedDict
+from contextlib import asynccontextmanager
+from typing import Any, TypedDict
 
 import markdown
 import pandas as pd
@@ -20,9 +21,12 @@ from models import (
     ApplicationContact,
     JobApplication,
     SavedJob,
+    SearchProfile,
     UserPreference,
 )
-from scraper import fetch_jobs
+from scheduler import start_scheduler, stop_scheduler
+from scraper import check_job_url_liveness, evaluate_job_staleness, fetch_jobs
+from task_manager import get_task, launch_scrape_task
 
 
 def render_markdown(text: str | None) -> str:
@@ -53,7 +57,17 @@ class WorkSearchLogEntry(TypedDict):
 # Create DB tables and apply column additions
 init_db()
 
-app = FastAPI(title="PyJobs")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if not os.environ.get("PYJOBS_TESTING"):
+        start_scheduler(SessionLocal)
+    yield
+    if not os.environ.get("PYJOBS_TESTING"):
+        stop_scheduler()
+
+
+app = FastAPI(title="PyJobs", lifespan=lifespan)
 
 # Ensure directories exist
 os.makedirs("templates/partials", exist_ok=True)
@@ -95,14 +109,28 @@ def query_filtered_jobs(
     site: str = "all",
     date_range: str = "all",
     show_hidden: bool = False,
+    profile_id: str | int = "all",
+    staleness: str = "all",
 ) -> list[SavedJob]:
-    """Queries saved jobs applying all active text, seniority, salary, site, and date filters."""
+    """Queries saved jobs applying active text, seniority, salary, site, and profile filters."""
     query = db.query(SavedJob)
 
     if not show_hidden:
         query = query.filter(SavedJob.is_hidden.is_(False))
     else:
         query = query.filter(SavedJob.is_hidden.is_(True))
+
+    if profile_id and str(profile_id) != "all":
+        try:
+            pid = int(profile_id)
+            query = query.filter(SavedJob.search_profiles.any(SearchProfile.id == pid))
+        except ValueError:
+            pass
+
+    if staleness == "active_only":
+        query = query.filter(SavedJob.is_stale.is_(False))
+    elif staleness == "stale_only":
+        query = query.filter(SavedJob.is_stale.is_(True))
 
     if q and q.strip():
         term = f"%{q.strip()}%"
@@ -202,7 +230,28 @@ def group_jobs(jobs: list[SavedJob], group_by: str) -> dict[str, list[SavedJob]]
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request, db: Session = Depends(get_db)):
-    pref = db.query(UserPreference).first()
+    profiles = db.query(SearchProfile).order_by(SearchProfile.id.asc()).all()
+    if not profiles:
+        pref = db.query(UserPreference).first()
+        now_utc = datetime.datetime.now(datetime.UTC)
+        default_profile = SearchProfile(
+            name="Primary Search",
+            positions=pref.positions if pref else "",
+            fields=pref.fields if pref else "",
+            location=pref.location if pref else "",
+            sites=pref.sites if pref else "linkedin,indeed,google",
+            is_remote=pref.is_remote if pref else False,
+            distance_miles=50,
+            results_wanted=25,
+            created_at=now_utc,
+        )
+        db.add(default_profile)
+        db.commit()
+        db.refresh(default_profile)
+        profiles = [default_profile]
+
+    active_profile = profiles[0]
+
     # Immediately load existing saved jobs on launch so the user is in curation mode
     jobs = (
         db.query(SavedJob)
@@ -215,7 +264,8 @@ async def index(request: Request, db: Session = Depends(get_db)):
         request=request,
         name="index.html",
         context={
-            "pref": pref,
+            "profiles": profiles,
+            "active_profile": active_profile,
             "jobs": jobs,
             "total_jobs_count": len(jobs),
             "group_by": "none",
@@ -237,6 +287,8 @@ async def filter_jobs(
     date_range: str = "all",
     show_hidden: bool = False,
     group_by: str = "none",
+    profile_id: str = "all",
+    staleness: str = "all",
     db: Session = Depends(get_db),
 ):
     jobs = query_filtered_jobs(
@@ -249,6 +301,8 @@ async def filter_jobs(
         site=site,
         date_range=date_range,
         show_hidden=show_hidden,
+        profile_id=profile_id,
+        staleness=staleness,
     )
     grouped = group_jobs(jobs, group_by=group_by)
     tracked_map = get_tracked_applications_map(db)
@@ -276,6 +330,8 @@ async def export_jobs(
     site: str = "all",
     date_range: str = "all",
     show_hidden: bool = False,
+    profile_id: str = "all",
+    staleness: str = "all",
     db: Session = Depends(get_db),
 ):
     jobs = query_filtered_jobs(
@@ -288,6 +344,8 @@ async def export_jobs(
         site=site,
         date_range=date_range,
         show_hidden=show_hidden,
+        profile_id=profile_id,
+        staleness=staleness,
     )
 
     data = [
@@ -330,6 +388,298 @@ async def export_jobs(
         )
 
 
+# ==============================================================================
+# Search Profiles Endpoints
+# ==============================================================================
+
+
+@app.get("/profiles/sidebar", response_class=HTMLResponse)
+async def get_profiles_sidebar(
+    request: Request,
+    profile_selector: str | None = None,
+    new: bool = False,
+    db: Session = Depends(get_db),
+):
+    profiles = db.query(SearchProfile).order_by(SearchProfile.id.asc()).all()
+    if not profiles:
+        default_p = SearchProfile(name="Primary Search")
+        db.add(default_p)
+        db.commit()
+        db.refresh(default_p)
+        profiles = [default_p]
+
+    is_new = new or (profile_selector == "new")
+    active_profile = None
+    if not is_new:
+        if profile_selector and profile_selector.isdigit():
+            active_profile = (
+                db.query(SearchProfile).filter(SearchProfile.id == int(profile_selector)).first()
+            )
+        if not active_profile and profiles:
+            active_profile = profiles[0]
+
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/profile_sidebar.html",
+        context={
+            "profiles": profiles,
+            "active_profile": active_profile,
+            "is_new": is_new,
+        },
+    )
+
+
+@app.post("/profiles", response_class=HTMLResponse)
+async def create_search_profile(
+    request: Request,
+    name: str = Form("New Profile"),
+    positions: str = Form(""),
+    fields: str = Form(""),
+    location: str = Form(""),
+    sites: list[str] = Form(default=[]),
+    is_remote: bool = Form(default=False),
+    distance_miles: int = Form(default=50),
+    results_wanted: int = Form(default=25),
+    refresh_interval_hours: int = Form(default=0),
+    refresh_on_launch: bool = Form(default=False),
+    db: Session = Depends(get_db),
+):
+    sites_str = ",".join(sites) if sites else "linkedin,indeed,google"
+    new_profile = SearchProfile(
+        name=name.strip() or "Untitled Profile",
+        positions=positions.strip(),
+        fields=fields.strip(),
+        location=location.strip(),
+        sites=sites_str,
+        is_remote=is_remote,
+        distance_miles=distance_miles,
+        results_wanted=results_wanted,
+        refresh_interval_hours=refresh_interval_hours,
+        refresh_on_launch=refresh_on_launch,
+    )
+    db.add(new_profile)
+    db.commit()
+    db.refresh(new_profile)
+
+    profiles = db.query(SearchProfile).order_by(SearchProfile.id.asc()).all()
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/profile_sidebar.html",
+        context={
+            "profiles": profiles,
+            "active_profile": new_profile,
+            "is_new": False,
+            "message": f"Profile '{new_profile.name}' created successfully!",
+        },
+    )
+
+
+@app.post("/profiles/{id}", response_class=HTMLResponse)
+async def update_search_profile(
+    request: Request,
+    id: int,
+    name: str = Form(""),
+    positions: str = Form(""),
+    fields: str = Form(""),
+    location: str = Form(""),
+    sites: list[str] = Form(default=[]),
+    is_remote: bool = Form(default=False),
+    distance_miles: int = Form(default=50),
+    results_wanted: int = Form(default=25),
+    refresh_interval_hours: int = Form(default=0),
+    refresh_on_launch: bool = Form(default=False),
+    db: Session = Depends(get_db),
+):
+    profile = db.query(SearchProfile).filter(SearchProfile.id == id).first()
+    if not profile:
+        return HTMLResponse("<div class='error-msg'>Profile not found.</div>", status_code=404)
+
+    sites_str = ",".join(sites) if sites else "linkedin,indeed,google"
+    profile.name = name.strip() or profile.name
+    profile.positions = positions.strip()
+    profile.fields = fields.strip()
+    profile.location = location.strip()
+    profile.sites = sites_str
+    profile.is_remote = is_remote
+    profile.distance_miles = distance_miles
+    profile.results_wanted = results_wanted
+    profile.refresh_interval_hours = refresh_interval_hours
+    profile.refresh_on_launch = refresh_on_launch
+    db.commit()
+
+    profiles = db.query(SearchProfile).order_by(SearchProfile.id.asc()).all()
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/profile_sidebar.html",
+        context={
+            "profiles": profiles,
+            "active_profile": profile,
+            "is_new": False,
+            "message": f"Profile '{profile.name}' updated successfully!",
+        },
+    )
+
+
+@app.delete("/profiles/{id}", response_class=HTMLResponse)
+async def delete_search_profile(request: Request, id: int, db: Session = Depends(get_db)):
+    profiles = db.query(SearchProfile).order_by(SearchProfile.id.asc()).all()
+    if len(profiles) <= 1:
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/profile_sidebar.html",
+            context={
+                "profiles": profiles,
+                "active_profile": profiles[0],
+                "is_new": False,
+                "message": "Cannot delete the only remaining profile.",
+            },
+        )
+
+    profile = db.query(SearchProfile).filter(SearchProfile.id == id).first()
+    if profile:
+        db.delete(profile)
+        db.commit()
+
+    updated_profiles = db.query(SearchProfile).order_by(SearchProfile.id.asc()).all()
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/profile_sidebar.html",
+        context={
+            "profiles": updated_profiles,
+            "active_profile": updated_profiles[0] if updated_profiles else None,
+            "is_new": False,
+            "message": "Profile deleted successfully.",
+        },
+    )
+
+
+# ==============================================================================
+# Asynchronous Scraping & Progress Tracking Endpoints
+# ==============================================================================
+
+
+@app.post("/scrape/start", response_class=HTMLResponse)
+async def start_scrape(
+    request: Request,
+    profile_id: str = "all",
+    db: Session = Depends(get_db),
+):
+    pid: int | None = None
+    profile_name = "All Profiles"
+    if profile_id != "all":
+        try:
+            pid = int(profile_id)
+            prof = db.query(SearchProfile).filter(SearchProfile.id == pid).first()
+            if prof:
+                profile_name = prof.name
+        except ValueError:
+            pass
+
+    session_factory = getattr(request.app.state, "session_factory", SessionLocal)
+    task = await launch_scrape_task(pid, session_factory, profile_name)
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/scrape_progress.html",
+        context={"task": task},
+    )
+
+
+@app.get("/scrape/status/{task_id}", response_class=HTMLResponse)
+async def get_scrape_status(request: Request, task_id: str, db: Session = Depends(get_db)):
+    task = get_task(task_id)
+    if not task:
+        return HTMLResponse("")
+
+    context: dict[str, Any] = {"task": task}
+    if task.status == "completed":
+        jobs = query_filtered_jobs(db)
+        tracked_map = get_tracked_applications_map(db)
+        context["jobs"] = jobs
+        context["group_by"] = "none"
+        context["show_hidden"] = False
+        context["tracked_map"] = tracked_map
+
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/scrape_progress.html",
+        context=context,
+    )
+
+
+# ==============================================================================
+# Staleness & Expiration Management Endpoints
+# ==============================================================================
+
+
+@app.post("/jobs/staleness/check", response_class=HTMLResponse)
+async def check_jobs_staleness(request: Request, db: Session = Depends(get_db)):
+    """Re-evaluates posting age and verifies live HTTP status on a batch of postings."""
+    jobs = db.query(SavedJob).filter(SavedJob.is_hidden.is_(False)).all()
+    now_utc = datetime.datetime.now(datetime.UTC)
+
+    checked_links = 0
+    for job in jobs:
+        job.is_stale = evaluate_job_staleness(job.date_posted, job.saved_at)
+
+        # Check up to 8 unverified job links per run
+        if checked_links < 8 and (
+            job.last_verified_at is None
+            or (
+                now_utc
+                - (
+                    job.last_verified_at.replace(tzinfo=datetime.UTC)
+                    if job.last_verified_at.tzinfo is None
+                    else job.last_verified_at
+                )
+            ).total_seconds()
+            > 86400 * 7
+        ):
+            if job.job_url:
+                is_alive = check_job_url_liveness(job.job_url)
+                job.is_link_dead = not is_alive
+                job.last_verified_at = now_utc
+                checked_links += 1
+
+    db.commit()
+    updated_jobs = query_filtered_jobs(db)
+    tracked_map = get_tracked_applications_map(db)
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/job_results.html",
+        context={
+            "jobs": updated_jobs,
+            "group_by": "none",
+            "show_hidden": False,
+            "tracked_map": tracked_map,
+        },
+    )
+
+
+@app.post("/jobs/staleness/auto-hide", response_class=HTMLResponse)
+async def auto_hide_stale_jobs(request: Request, db: Session = Depends(get_db)):
+    """Automatically marks all stale postings (30d+) as hidden."""
+    stale_jobs = (
+        db.query(SavedJob).filter(SavedJob.is_stale.is_(True), SavedJob.is_hidden.is_(False)).all()
+    )
+    for job in stale_jobs:
+        job.is_hidden = True
+    db.commit()
+
+    updated_jobs = query_filtered_jobs(db)
+    tracked_map = get_tracked_applications_map(db)
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/job_results.html",
+        context={
+            "jobs": updated_jobs,
+            "group_by": "none",
+            "show_hidden": False,
+            "tracked_map": tracked_map,
+        },
+    )
+
+
+# Legacy preferences endpoint maintained for backward compatibility
 @app.post("/preferences", response_class=HTMLResponse)
 async def save_preferences(
     request: Request,
