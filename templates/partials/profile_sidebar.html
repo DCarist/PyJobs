@@ -259,9 +259,8 @@
       <button
         type="button"
         class="btn-primary"
-        hx-post="/scrape/start?profile_id={{ active_profile.id }}"
-        hx-target="#scrape-progress-container"
-        hx-indicator="#scrape-loader-{{ active_profile.id }}"
+        id="scrape-profile-btn"
+        onclick="window.handleProfileScrape('{{ active_profile.id }}')"
         style="justify-content: center;"
         title="Trigger background scrape for this profile"
       >
@@ -296,6 +295,63 @@
     {% endif %}
   </form>
 
+  {% if not is_new and active_profile %}
+  <!-- Unsaved Changes Confirmation Modal -->
+  <dialog
+    id="unsaved-profile-modal"
+    class="modal-dialog glass-panel"
+    aria-labelledby="unsaved-modal-title"
+  >
+    <div style="display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1.25rem;">
+      <div style="font-size: 1.75rem; line-height: 1; flex-shrink: 0;" aria-hidden="true">
+        &#9888;&#65039;
+      </div>
+      <div>
+        <h3
+          id="unsaved-modal-title"
+          style="margin: 0 0 0.35rem 0; font-size: 1.15rem; color: var(--text-primary);"
+        >
+          Unsaved Profile Changes
+        </h3>
+        <p style="margin: 0; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.45;">
+          You have unsaved changes to profile '<strong>{{ active_profile.name }}</strong>'. Would
+          you like to save these changes before running the scrape?
+        </p>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1.25rem;">
+      <button
+        type="button"
+        class="btn-primary"
+        id="modal-save-and-scrape"
+        onclick="window.saveAndScrapeProfile('{{ active_profile.id }}')"
+        style="justify-content: center; width: 100%;"
+      >
+        Save Changes &amp; Scrape
+      </button>
+      <button
+        type="button"
+        class="btn-secondary"
+        id="modal-scrape-without-saving"
+        onclick="window.scrapeWithoutSaving('{{ active_profile.id }}')"
+        style="justify-content: center; width: 100%;"
+      >
+        Scrape Without Saving
+      </button>
+      <button
+        type="button"
+        class="btn-secondary"
+        id="modal-cancel-scrape"
+        onclick="document.getElementById('unsaved-profile-modal').close()"
+        style="justify-content: center; width: 100%; border-color: transparent; color: var(--text-secondary);"
+      >
+        Cancel
+      </button>
+    </div>
+  </dialog>
+  {% endif %}
+
   <!-- Global Batch Scrape Action -->
   <div
     style="margin-top: 1.75rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color);"
@@ -319,3 +375,9 @@
     </small>
   </div>
 </div>
+
+<script>
+if (typeof window.initProfileFormState === "function") {
+  window.initProfileFormState();
+}
+</script>

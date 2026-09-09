@@ -227,3 +227,21 @@ def test_filter_by_profile_and_staleness(client, db_session):
     assert res_stale.status_code == 200
     assert "Job Alpha" not in res_stale.text
     assert "Job Beta" in res_stale.text
+
+
+def test_profile_sidebar_unsaved_modal_markup(client, db_session):
+    p = SearchProfile(name="Fullstack Dev", positions="Fullstack Developer")
+    db_session.add(p)
+    db_session.commit()
+
+    res = client.get(f"/profiles/sidebar?profile_id={p.id}")
+    assert res.status_code == 200
+    assert 'id="scrape-profile-btn"' in res.text
+    assert f"window.handleProfileScrape('{p.id}')" in res.text
+    assert 'id="unsaved-profile-modal"' in res.text
+    assert "Unsaved Profile Changes" in res.text
+    assert 'id="modal-save-and-scrape"' in res.text
+    assert f"window.saveAndScrapeProfile('{p.id}')" in res.text
+    assert 'id="modal-scrape-without-saving"' in res.text
+    assert f"window.scrapeWithoutSaving('{p.id}')" in res.text
+    assert 'id="modal-cancel-scrape"' in res.text

@@ -1849,3 +1849,24 @@ details[open] > summary.group-summary .group-chevron {
   color: #a78bfa;
   border: 1px solid rgba(139, 92, 246, 0.3);
 }
+
+/* ==============================================================================
+   Modal Dialog & Glassmorphic Backdrop Styles
+   ============================================================================== */
+dialog.modal-dialog {
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  background: #1e293b;
+  color: var(--text-primary);
+  max-width: 480px;
+  width: 90%;
+  padding: 1.5rem;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6);
+  margin: auto;
+}
+
+dialog.modal-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
