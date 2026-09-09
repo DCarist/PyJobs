@@ -9,4 +9,6 @@ wheels/
 # Virtual environments
 .venv
 pyjobs.db
+*.db-journal
+*.db-wal
 .env
