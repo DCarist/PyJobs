@@ -1,8 +1,12 @@
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+
+os.environ["PYJOBS_TESTING"] = "1"
 
 from database import Base
 from main import app, get_db
@@ -37,6 +41,7 @@ def client(db_session):
             pass
 
     app.dependency_overrides[get_db] = override_get_db
+    app.state.session_factory = TestingSessionLocal
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

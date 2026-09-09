@@ -1,13 +1,8 @@
 {% extends "base.html" %} {% block content %}
 <div class="grid">
-  <!-- Left Column: Search Preferences -->
+  <!-- Left Column: Search Profiles & Granular Controls -->
   <aside class="glass-panel" style="padding: 1.5rem; height: fit-content;">
-    <div
-      style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;"
-    >
-      <h2 style="margin: 0; font-size: 1.25rem;">Search Preferences</h2>
-    </div>
-    <div id="preferences-container">{% include "partials/preferences_form.html" %}</div>
+    <div id="profile-sidebar-container">{% include "partials/profile_sidebar.html" %}</div>
   </aside>
 
   <!-- Right Column: Local Curation Workspace & Live Scraping Action -->
@@ -26,11 +21,11 @@
         <button
           type="button"
           class="btn-primary"
-          hx-post="/search"
-          hx-target="#job-results"
+          hx-post="/scrape/start?profile_id=all"
+          hx-target="#scrape-progress-container"
           hx-indicator="#search-loader"
           style="width: auto; padding: 0.65rem 1.25rem;"
-          title="Queries external job boards (LinkedIn, Indeed, Google) to import newly posted jobs into your local database"
+          title="Queries external job boards across all profiles asynchronously with live progress"
         >
           <span class="btn-text">🌐 Run Live Web Scrape</span>
           <div class="loader" id="search-loader"></div>
@@ -39,10 +34,13 @@
           class="scrape-hint"
           style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.35rem;"
         >
-          Pulls fresh postings from the web
+          Pulls fresh postings across saved profiles
         </span>
       </div>
     </div>
+
+    <!-- Scrape Progress & Status Container -->
+    <div id="scrape-progress-container"></div>
 
     <!-- Curation Toolbar: Fast Local Database Filtering, Sorting & Grouping -->
     <div class="curation-toolbar glass-panel">
@@ -150,11 +148,35 @@
               <option value="30d">Past Month</option>
             </select>
           </div>
+
+          <!-- Discovery Profile Filter -->
+          <div class="control-item">
+            <label for="profile-select">Discovered By</label>
+            <select name="profile_id" id="profile-select">
+              <option value="all">All Discovery Profiles</option>
+              {% for p in profiles %}
+              <option value="{{ p.id }}">{{ p.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Posting Staleness / Freshness Filter -->
+          <div class="control-item">
+            <label for="staleness-select">Posting Freshness</label>
+            <select name="staleness" id="staleness-select">
+              <option value="all">All (Active & Aging)</option>
+              <option value="active_only">Active Only (&lt; 30d)</option>
+              <option value="stale_only">Aging / Stale Only (30d+)</option>
+            </select>
+          </div>
         </div>
 
         <!-- Toggles & Export Toolbar Row -->
         <div class="toolbar-bottom-row">
-          <div class="toggles-group">
+          <div
+            class="toggles-group"
+            style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: center;"
+          >
             <label class="checkbox-label" for="include_unspecified">
               <input
                 type="checkbox"
@@ -170,6 +192,32 @@
               <input type="checkbox" id="show_hidden" name="show_hidden" value="true">
               <span>View hidden postings</span>
             </label>
+
+            <!-- Staleness Actions -->
+            <button
+              type="button"
+              class="btn-secondary btn-small"
+              hx-post="/jobs/staleness/check"
+              hx-target="#job-results"
+              hx-indicator="#staleness-loader"
+              title="Verify link accessibility and calculate posting age"
+              style="font-size: 0.8rem; padding: 0.25rem 0.6rem;"
+            >
+              <span>🔍 Check Links & Age</span>
+              <div class="loader" id="staleness-loader"></div>
+            </button>
+
+            <button
+              type="button"
+              class="btn-secondary btn-small"
+              hx-post="/jobs/staleness/auto-hide"
+              hx-target="#job-results"
+              hx-confirm="Automatically hide all postings older than 30 days?"
+              title="Auto-hide all aging/stale postings from feed"
+              style="font-size: 0.8rem; padding: 0.25rem 0.6rem; color: #f59e0b; border-color: rgba(245, 158, 11, 0.3);"
+            >
+              🧹 Auto-Hide Stale
+            </button>
           </div>
 
           <!-- Export Action Buttons -->

@@ -1,6 +1,9 @@
+import datetime
 import logging
 import os
 import re
+import urllib.error
+import urllib.request
 from typing import Any
 
 import pandas as pd
@@ -220,6 +223,7 @@ def fetch_jobs(
     results_wanted: int = 20,
     sites: list[str] | None = None,
     is_remote: bool = False,
+    hours_old: int | None = None,
     proxies: list[str] | str | None = None,
 ) -> list[dict[str, Any]]:
     """Scrapes jobs across specified sites with multi-location and remote handling."""
@@ -257,6 +261,7 @@ def fetch_jobs(
                 distance=distance_miles,
                 is_remote=target_remote,
                 results_wanted=results_wanted,
+                hours_old=hours_old,  # ty: ignore[invalid-argument-type]
                 country_indeed="usa",
                 proxies=proxy_config,
             )
@@ -327,3 +332,69 @@ def fetch_jobs(
             )
 
     return combined_jobs
+
+
+def check_job_url_liveness(url: str, timeout: float = 5.0) -> bool:
+    """Checks if a job URL is still accessible (returns HTTP 200/3xx).
+
+    Returns False if HTTP 404/410, domain not found, or connection fails.
+    """
+    if not url or not url.startswith(("http://", "https://")):
+        return False
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                )
+            },
+            method="HEAD",
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            return response.status < 400
+    except urllib.error.HTTPError as e:
+        if e.code in (404, 410):
+            return False
+        if e.code in (403, 405):
+            try:
+                get_req = urllib.request.Request(
+                    url,
+                    headers={
+                        "User-Agent": (
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                            "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            "Chrome/120.0.0.0 Safari/537.36"
+                        ),
+                        "Range": "bytes=0-1024",
+                    },
+                )
+                with urllib.request.urlopen(get_req, timeout=timeout) as get_res:
+                    return get_res.status < 400
+            except urllib.error.HTTPError as get_err:
+                return get_err.code not in (404, 410)
+            except Exception:
+                return False
+        return False
+    except Exception:
+        return False
+
+
+def evaluate_job_staleness(
+    date_posted: datetime.datetime | datetime.date | None,
+    saved_at: datetime.datetime | None = None,
+    max_age_days: int = 30,
+) -> bool:
+    """Returns True if the job is older than max_age_days."""
+    now = datetime.datetime.now(datetime.UTC)
+    ref_date = date_posted or saved_at
+    if not ref_date:
+        return False
+    if isinstance(ref_date, datetime.date) and not isinstance(ref_date, datetime.datetime):
+        ref_date = datetime.datetime.combine(ref_date, datetime.time.min, tzinfo=datetime.UTC)
+    elif ref_date.tzinfo is None:
+        ref_date = ref_date.replace(tzinfo=datetime.UTC)
+    age = now - ref_date
+    return age.total_seconds() > (max_age_days * 86400)

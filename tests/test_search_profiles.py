@@ -1,0 +1,229 @@
+import datetime
+from unittest.mock import patch
+
+from models import JobSearchProfile, SavedJob, SearchProfile
+from scraper import evaluate_job_staleness
+from task_manager import run_scrape_task_sync
+
+
+def test_create_and_update_search_profile(client, db_session):
+    # 1. Create a profile
+    response = client.post(
+        "/profiles",
+        data={
+            "name": "Python Lead",
+            "positions": "Senior Python Developer",
+            "fields": "FastAPI, PostgreSQL",
+            "location": "Philadelphia, PA",
+            "sites": ["linkedin", "indeed"],
+            "is_remote": True,
+            "distance_miles": 25,
+            "results_wanted": 50,
+            "refresh_interval_hours": 6,
+            "refresh_on_launch": True,
+        },
+    )
+    assert response.status_code == 200
+    assert "Python Lead" in response.text
+    assert "created successfully!" in response.text
+
+    profile = db_session.query(SearchProfile).filter(SearchProfile.name == "Python Lead").first()
+    assert profile is not None
+    assert profile.distance_miles == 25
+    assert profile.results_wanted == 50
+    assert profile.refresh_interval_hours == 6
+    assert profile.refresh_on_launch is True
+    assert profile.is_remote is True
+
+    # 2. Update the profile
+    update_res = client.post(
+        f"/profiles/{profile.id}",
+        data={
+            "name": "Python Principal",
+            "positions": "Principal Python Engineer",
+            "fields": "Cloud, Architecture",
+            "location": "Remote",
+            "sites": ["linkedin"],
+            "is_remote": True,
+            "distance_miles": 100,
+            "results_wanted": 100,
+            "refresh_interval_hours": 12,
+            "refresh_on_launch": False,
+        },
+    )
+    assert update_res.status_code == 200
+    assert "Python Principal" in update_res.text
+    assert "updated successfully!" in update_res.text
+
+    db_session.refresh(profile)
+    assert profile.name == "Python Principal"
+    assert profile.distance_miles == 100
+    assert profile.refresh_interval_hours == 12
+
+
+def test_delete_search_profile(client, db_session):
+    p1 = SearchProfile(name="Profile 1", positions="Dev")
+    p2 = SearchProfile(name="Profile 2", positions="QA")
+    db_session.add_all([p1, p2])
+    db_session.commit()
+
+    # Delete p2
+    del_res = client.delete(f"/profiles/{p2.id}")
+    assert del_res.status_code == 200
+    assert "Profile deleted successfully." in del_res.text
+    assert db_session.query(SearchProfile).filter(SearchProfile.id == p2.id).first() is None
+
+    # Try deleting p1 (last remaining profile)
+    del_last = client.delete(f"/profiles/{p1.id}")
+    assert del_last.status_code == 200
+    assert "Cannot delete the only remaining profile." in del_last.text
+    assert db_session.query(SearchProfile).filter(SearchProfile.id == p1.id).first() is not None
+
+
+def test_async_scrape_flow_and_metrics(client, db_session):
+    profile = SearchProfile(
+        name="Backend Core",
+        positions="Backend Engineer",
+        location="Remote",
+        sites="linkedin",
+        distance_miles=50,
+        results_wanted=15,
+    )
+    db_session.add(profile)
+    db_session.commit()
+
+    mock_jobs = [
+        {
+            "job_id": "test-job-101",
+            "site": "linkedin",
+            "title": "Backend Engineer",
+            "company": "Tech Corp",
+            "location": "Remote",
+            "salary_source": "USD 120000 / yearly",
+            "min_salary": 120000.0,
+            "max_salary": 140000.0,
+            "salary_interval": "yearly",
+            "salary_bracket": "$120k - $160k",
+            "seniority_level": "Specialist / Contributor",
+            "job_url": "https://example.com/job101",
+            "date_posted": datetime.datetime.now(datetime.UTC),
+        }
+    ]
+
+    with patch("task_manager.fetch_jobs", return_value=mock_jobs):
+        # Trigger async scrape start
+        response = client.post(f"/scrape/start?profile_id={profile.id}")
+        assert response.status_code == 200
+        assert "Scraping in progress" in response.text
+
+        # Extract task_id from markup
+        import re
+
+        m = re.search(r"/scrape/status/([a-zA-Z0-9_-]+)", response.text)
+        assert m is not None
+        task_id = m.group(1)
+        prof_id = profile.id
+        session_factory = client.app.state.session_factory
+        run_scrape_task_sync(task_id, prof_id, session_factory)
+
+        # Check completed status response
+        status_res = client.get(f"/scrape/status/{task_id}")
+        assert status_res.status_code == 200
+        assert "Scrape Completed" in status_res.text
+        assert "Newly Added" in status_res.text
+        assert "Metadata Refreshed" in status_res.text
+
+        # Verify job was inserted and linked to profile
+        saved_job = db_session.query(SavedJob).filter(SavedJob.job_id == "test-job-101").first()
+        assert saved_job is not None
+        assoc = (
+            db_session.query(JobSearchProfile)
+            .filter(
+                JobSearchProfile.saved_job_id == saved_job.id,
+                JobSearchProfile.search_profile_id == prof_id,
+            )
+            .first()
+        )
+        assert assoc is not None
+
+
+def test_staleness_detection_and_auto_hide(client, db_session):
+    now = datetime.datetime.now(datetime.UTC)
+    old_date = now - datetime.timedelta(days=40)
+    fresh_date = now - datetime.timedelta(days=5)
+
+    # Unit test evaluate_job_staleness
+    assert evaluate_job_staleness(old_date, max_age_days=30) is True
+    assert evaluate_job_staleness(fresh_date, max_age_days=30) is False
+
+    # Seed an aging job and a fresh job
+    old_job = SavedJob(
+        job_id="old-job-1",
+        title="Legacy Role",
+        company="Old Co",
+        date_posted=old_date,
+        is_stale=False,
+        is_hidden=False,
+    )
+    fresh_job = SavedJob(
+        job_id="fresh-job-1",
+        title="Modern Role",
+        company="New Co",
+        date_posted=fresh_date,
+        is_stale=False,
+        is_hidden=False,
+    )
+    db_session.add_all([old_job, fresh_job])
+    db_session.commit()
+
+    # Trigger staleness check endpoint
+    check_res = client.post("/jobs/staleness/check")
+    assert check_res.status_code == 200
+    db_session.refresh(old_job)
+    db_session.refresh(fresh_job)
+    assert old_job.is_stale is True
+    assert fresh_job.is_stale is False
+
+    # Trigger auto-hide stale endpoint
+    hide_res = client.post("/jobs/staleness/auto-hide")
+    assert hide_res.status_code == 200
+    db_session.refresh(old_job)
+    db_session.refresh(fresh_job)
+    assert old_job.is_hidden is True
+    assert fresh_job.is_hidden is False
+
+
+def test_filter_by_profile_and_staleness(client, db_session):
+    p1 = SearchProfile(name="Profile Alpha", positions="Alpha")
+    p2 = SearchProfile(name="Profile Beta", positions="Beta")
+    db_session.add_all([p1, p2])
+    db_session.commit()
+
+    job1 = SavedJob(job_id="j1", title="Job Alpha", company="Co 1", is_stale=False, is_hidden=False)
+    job2 = SavedJob(job_id="j2", title="Job Beta", company="Co 2", is_stale=True, is_hidden=False)
+    db_session.add_all([job1, job2])
+    db_session.commit()
+
+    # Link job1 to p1, job2 to p2
+    assoc1 = JobSearchProfile(saved_job_id=job1.id, search_profile_id=p1.id)
+    assoc2 = JobSearchProfile(saved_job_id=job2.id, search_profile_id=p2.id)
+    db_session.add_all([assoc1, assoc2])
+    db_session.commit()
+
+    # Filter by profile p1
+    res_p1 = client.get(f"/jobs/filter?profile_id={p1.id}")
+    assert res_p1.status_code == 200
+    assert "Job Alpha" in res_p1.text
+    assert "Job Beta" not in res_p1.text
+
+    # Filter by active_only staleness
+    res_active = client.get("/jobs/filter?staleness=active_only")
+    assert res_active.status_code == 200
+    assert "Job Alpha" in res_active.text
+    assert "Job Beta" not in res_active.text
+
+    # Filter by stale_only staleness
+    res_stale = client.get("/jobs/filter?staleness=stale_only")
+    assert res_stale.status_code == 200
+    assert "Job Alpha" not in res_stale.text
+    assert "Job Beta" in res_stale.text

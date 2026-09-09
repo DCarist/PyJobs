@@ -43,7 +43,17 @@
         <span class="badge salary-badge">💰 {{ job.salary_source }}</span>
         {% endif %} {% if job.date_posted %}
         <span class="badge">🕒 {{ job.date_posted.strftime('%b %d, %Y') }}</span>
-        {% endif %} {% if job.is_hidden %}
+        {% endif %} {% if job.is_stale %}
+        <span class="badge stale-badge" title="Posting is 30+ days old">⏳ Aging (30d+)</span>
+        {% endif %} {% if job.is_link_dead %}
+        <span class="badge dead-link-badge" title="Posting link returned inactive"
+          >⚠️ Link Inactive</span
+        >
+        {% endif %} {% if job.search_profiles %} {% for prof in job.search_profiles %}
+        <span class="badge profile-badge" title="Discovered by profile: {{ prof.name }}"
+          >🔍 {{ prof.name }}</span
+        >
+        {% endfor %} {% endif %} {% if job.is_hidden %}
         <span class="badge hidden-badge">Hidden</span>
         {% endif %}
       </div>
@@ -89,7 +99,17 @@
     <span class="badge salary-badge">💰 {{ job.salary_source }}</span>
     {% endif %} {% if job.date_posted %}
     <span class="badge">🕒 {{ job.date_posted.strftime('%b %d, %Y') }}</span>
-    {% endif %} {% if job.is_hidden %}
+    {% endif %} {% if job.is_stale %}
+    <span class="badge stale-badge" title="Posting is 30+ days old">⏳ Aging (30d+)</span>
+    {% endif %} {% if job.is_link_dead %}
+    <span class="badge dead-link-badge" title="Posting link returned inactive"
+      >⚠️ Link Inactive</span
+    >
+    {% endif %} {% if job.search_profiles %} {% for prof in job.search_profiles %}
+    <span class="badge profile-badge" title="Discovered by profile: {{ prof.name }}"
+      >🔍 {{ prof.name }}</span
+    >
+    {% endfor %} {% endif %} {% if job.is_hidden %}
     <span class="badge hidden-badge">Hidden</span>
     {% endif %}
   </div>

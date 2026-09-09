@@ -1,0 +1,321 @@
+<div class="profile-sidebar">
+  <!-- Profile Selection Tabs / Dropdown Header -->
+  <div class="profile-header-tabs" style="margin-bottom: 1.25rem;">
+    <div
+      style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;"
+    >
+      <label for="profile_selector" style="margin: 0; font-weight: 600; color: var(--text-primary);"
+        >Search Profile</label
+      >
+      <button
+        type="button"
+        class="btn-secondary btn-small"
+        hx-get="/profiles/sidebar?new=true"
+        hx-target="#profile-sidebar-container"
+        title="Create a new search profile"
+        style="padding: 0.25rem 0.6rem; font-size: 0.8rem;"
+      >
+        + New Profile
+      </button>
+    </div>
+
+    <select
+      id="profile_selector"
+      name="profile_selector"
+      hx-get="/profiles/sidebar"
+      hx-target="#profile-sidebar-container"
+      hx-trigger="change"
+      style="width: 100%; padding: 0.5rem 0.75rem; font-size: 0.95rem; border-radius: 8px;"
+    >
+      {% for p in profiles %} {% if active_profile and p.id == active_profile.id and not is_new %}
+      <option value="{{ p.id }}" selected>
+        {{ p.name }} {% if p.jobs %}({{ p.jobs|length }} jobs){% endif %}
+      </option>
+      {% else %}
+      <option value="{{ p.id }}">
+        {{ p.name }} {% if p.jobs %}({{ p.jobs|length }} jobs){% endif %}
+      </option>
+      {% endif %} {% endfor %} {% if is_new %}
+      <option value="new" selected>+ Create New Profile...</option>
+      {% endif %}
+    </select>
+  </div>
+
+  <!-- Profile Criteria Form -->
+  <form
+    hx-post="{{ '/profiles' if is_new else ('/profiles/' ~ active_profile.id) }}"
+    hx-target="#profile-sidebar-container"
+    id="profile-form"
+  >
+    <div class="form-group">
+      <label for="prof_name">Profile Name</label>
+      <input
+        type="text"
+        id="prof_name"
+        name="name"
+        value="{{ '' if is_new else (active_profile.name if active_profile else 'Primary Search') }}"
+        placeholder="e.g. Senior Python Developer"
+        required
+      >
+    </div>
+
+    <div class="form-group">
+      <label for="prof_positions">Target Position / Roles</label>
+      <input
+        type="text"
+        id="prof_positions"
+        name="positions"
+        value="{{ '' if is_new else (active_profile.positions if active_profile else '') }}"
+        placeholder="e.g. Python Developer, Backend Engineer"
+        required
+      >
+    </div>
+
+    <div class="form-group">
+      <label for="prof_fields">Keywords / Specialty (Optional)</label>
+      <input
+        type="text"
+        id="prof_fields"
+        name="fields"
+        value="{{ '' if is_new else (active_profile.fields if active_profile else '') }}"
+        placeholder="e.g. FastAPI, SQLAlchemy, AWS"
+      >
+    </div>
+
+    <div class="form-group">
+      <label for="prof_location">Location(s)</label>
+      <input
+        type="text"
+        id="prof_location"
+        name="location"
+        value="{{ '' if is_new else (active_profile.location if active_profile else '') }}"
+        placeholder="e.g. Philadelphia, PA or Remote"
+      >
+    </div>
+
+    <div class="form-group">
+      <label class="checkbox-label" for="prof_is_remote">
+        {% if not is_new and active_profile and active_profile.is_remote %}
+        <input type="checkbox" id="prof_is_remote" name="is_remote" value="true" checked>
+        {% else %}
+        <input type="checkbox" id="prof_is_remote" name="is_remote" value="true">
+        {% endif %}
+        <span>Include Remote / Telecommute Postings</span>
+      </label>
+    </div>
+
+    <!-- Granular Scrape Parameters Grid -->
+    <div
+      style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem;"
+    >
+      <div class="form-group" style="margin-bottom: 0;">
+        <label for="prof_distance">Radius (Miles)</label>
+        <select id="prof_distance" name="distance_miles">
+          {% set dist = 50 if is_new or not active_profile else active_profile.distance_miles %} {%
+          if dist == 15 %}
+          <option value="15" selected>15 miles</option>
+          {% else %}
+          <option value="15">15 miles</option>
+          {% endif %} {% if dist == 25 %}
+          <option value="25" selected>25 miles</option>
+          {% else %}
+          <option value="25">25 miles</option>
+          {% endif %} {% if dist == 50 %}
+          <option value="50" selected>50 miles</option>
+          {% else %}
+          <option value="50">50 miles</option>
+          {% endif %} {% if dist == 100 %}
+          <option value="100" selected>100 miles</option>
+          {% else %}
+          <option value="100">100 miles</option>
+          {% endif %}
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 0;">
+        <label for="prof_results">Results Depth</label>
+        <select id="prof_results" name="results_wanted">
+          {% set rw = 25 if is_new or not active_profile else active_profile.results_wanted %} {% if
+          rw == 15 %}
+          <option value="15" selected>15 per board</option>
+          {% else %}
+          <option value="15">15 per board</option>
+          {% endif %} {% if rw == 25 %}
+          <option value="25" selected>25 per board</option>
+          {% else %}
+          <option value="25">25 per board</option>
+          {% endif %} {% if rw == 50 %}
+          <option value="50" selected>50 per board</option>
+          {% else %}
+          <option value="50">50 per board</option>
+          {% endif %} {% if rw == 100 %}
+          <option value="100" selected>100 per board</option>
+          {% else %}
+          <option value="100">100 per board</option>
+          {% endif %}
+        </select>
+      </div>
+    </div>
+
+    <!-- Automated Scheduling & Freshness -->
+    <div
+      class="form-group"
+      style="padding: 0.85rem; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px;"
+    >
+      <label
+        for="prof_refresh"
+        style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.4rem;"
+        >Automated Refresh Schedule</label
+      >
+      <select id="prof_refresh" name="refresh_interval_hours" style="margin-bottom: 0.6rem;">
+        {% set intv = 0 if is_new or not active_profile else active_profile.refresh_interval_hours
+        %} {% if intv == 0 %}
+        <option value="0" selected>Manual Only</option>
+        {% else %}
+        <option value="0">Manual Only</option>
+        {% endif %} {% if intv == 6 %}
+        <option value="6" selected>Every 6 Hours</option>
+        {% else %}
+        <option value="6">Every 6 Hours</option>
+        {% endif %} {% if intv == 12 %}
+        <option value="12" selected>Every 12 Hours</option>
+        {% else %}
+        <option value="12">Every 12 Hours</option>
+        {% endif %} {% if intv == 24 %}
+        <option value="24" selected>Daily (Every 24h)</option>
+        {% else %}
+        <option value="24">Daily (Every 24h)</option>
+        {% endif %}
+      </select>
+
+      <label class="checkbox-label" for="prof_refresh_launch" style="font-size: 0.85rem;">
+        {% if not is_new and active_profile and active_profile.refresh_on_launch %}
+        <input
+          type="checkbox"
+          id="prof_refresh_launch"
+          name="refresh_on_launch"
+          value="true"
+          checked
+        >
+        {% else %}
+        <input type="checkbox" id="prof_refresh_launch" name="refresh_on_launch" value="true">
+        {% endif %}
+        <span>Auto-refresh on PyJobs startup</span>
+      </label>
+    </div>
+
+    <!-- Active Job Boards -->
+    <div class="form-group">
+      <span class="label-heading">Job Boards</span>
+      <div class="checkbox-group">
+        {% set active_sites = (active_profile.sites.split(',') if not is_new and active_profile and
+        active_profile.sites else ['linkedin', 'indeed', 'google']) %}
+        <label class="checkbox-label" for="prof_site_linkedin">
+          {% if 'linkedin' in active_sites %}
+          <input type="checkbox" id="prof_site_linkedin" name="sites" value="linkedin" checked>
+          {% else %}
+          <input type="checkbox" id="prof_site_linkedin" name="sites" value="linkedin">
+          {% endif %}
+          <span>LinkedIn</span>
+        </label>
+        <label class="checkbox-label" for="prof_site_indeed">
+          {% if 'indeed' in active_sites %}
+          <input type="checkbox" id="prof_site_indeed" name="sites" value="indeed" checked>
+          {% else %}
+          <input type="checkbox" id="prof_site_indeed" name="sites" value="indeed">
+          {% endif %}
+          <span>Indeed</span>
+        </label>
+        <label class="checkbox-label" for="prof_site_google">
+          {% if 'google' in active_sites %}
+          <input type="checkbox" id="prof_site_google" name="sites" value="google" checked>
+          {% else %}
+          <input type="checkbox" id="prof_site_google" name="sites" value="google">
+          {% endif %}
+          <span>Google Jobs</span>
+        </label>
+        <label class="checkbox-label" for="prof_site_zip">
+          {% if 'zip_recruiter' in active_sites %}
+          <input type="checkbox" id="prof_site_zip" name="sites" value="zip_recruiter" checked>
+          {% else %}
+          <input type="checkbox" id="prof_site_zip" name="sites" value="zip_recruiter">
+          {% endif %}
+          <span>ZipRecruiter</span>
+        </label>
+        <label class="checkbox-label" for="prof_site_glassdoor">
+          {% if 'glassdoor' in active_sites %}
+          <input type="checkbox" id="prof_site_glassdoor" name="sites" value="glassdoor" checked>
+          {% else %}
+          <input type="checkbox" id="prof_site_glassdoor" name="sites" value="glassdoor">
+          {% endif %}
+          <span>Glassdoor</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div style="display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1.5rem;">
+      {% if not is_new and active_profile %}
+      <button
+        type="button"
+        class="btn-primary"
+        hx-post="/scrape/start?profile_id={{ active_profile.id }}"
+        hx-target="#scrape-progress-container"
+        hx-indicator="#scrape-loader-{{ active_profile.id }}"
+        style="justify-content: center;"
+        title="Trigger background scrape for this profile"
+      >
+        <span>Scrape This Profile</span>
+        <div class="loader" id="scrape-loader-{{ active_profile.id }}"></div>
+      </button>
+      {% endif %}
+
+      <div style="display: flex; gap: 0.5rem;">
+        <button type="submit" class="btn-secondary" style="flex: 1; justify-content: center;">
+          {{ "Create Profile" if is_new else "Save Profile" }}
+        </button>
+
+        {% if not is_new and active_profile and profiles|length > 1 %}
+        <button
+          type="button"
+          class="btn-secondary"
+          hx-delete="/profiles/{{ active_profile.id }}"
+          hx-target="#profile-sidebar-container"
+          hx-confirm="Are you sure you want to delete profile '{{ active_profile.name }}'?"
+          style="color: var(--danger); border-color: rgba(239, 68, 68, 0.4);"
+          title="Delete profile"
+        >
+          Delete
+        </button>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if message %}
+    <div class="success-msg" style="margin-top: 1rem;">{{ message }}</div>
+    {% endif %}
+  </form>
+
+  <!-- Global Batch Scrape Action -->
+  <div
+    style="margin-top: 1.75rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color);"
+  >
+    <button
+      type="button"
+      class="btn-secondary"
+      hx-post="/scrape/start?profile_id=all"
+      hx-target="#scrape-progress-container"
+      hx-indicator="#batch-scrape-loader"
+      style="width: 100%; justify-content: center; font-size: 0.9rem;"
+      title="Scrapes postings across all active search profiles in sequence"
+    >
+      <span>Run All Profiles (Batch)</span>
+      <div class="loader" id="batch-scrape-loader"></div>
+    </button>
+    <small
+      style="color: var(--text-secondary); font-size: 0.75rem; display: block; text-align: center; margin-top: 0.4rem;"
+    >
+      Runs sequential background search across {{ profiles|length }} saved profiles
+    </small>
+  </div>
+</div>
