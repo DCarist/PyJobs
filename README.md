@@ -22,19 +22,41 @@ uv tool install ty
 
 ### Running the Application
 
-**Option 1: One-Click Launcher (Recommended)**
-Double-click `run.bat` in the project root. It will start the server and automatically open PyJobs in your default web browser.
+**Option 1: One-Click Local Launcher (This Machine Only)**
+Double-click `run.bat` in the project root. It will start the server on `127.0.0.1:8000` and automatically open PyJobs in your default web browser.
 
-**Option 2: CLI Command**
+**Option 2: One-Click Local Network Launcher (Other Devices on LAN)**
+Double-click `run_network.bat` in the project root. It binds to `0.0.0.0:8000`, automatically detects your machine's primary Wi-Fi/Ethernet LAN IP, and displays the direct access link:
+```text
+===================================================
+             PyJobs Local Network Server
+===================================================
+  * Local machine:  http://localhost:8000
+  * Local IP:       http://127.0.0.1:8000
+  * LAN Network:    http://192.168.1.X:8000
+---------------------------------------------------
+  Connect any device on the same local Wi-Fi or LAN.
+  Press Ctrl+C in this terminal to stop the server.
+===================================================
+```
+Other laptops, smartphones, or tablets on the same local Wi-Fi can navigate directly to `http://<LAN_IP>:8000`.
+
+**Option 3: CLI Commands**
 ```bash
+# Standard local mode
 uv run pyjobs
+
+# Local network mode (accessible across LAN)
+uv run python run.py --network
+
+# Custom port or interface
+uv run python run.py --host 0.0.0.0 --port 8080
 ```
 
-**Option 3: Direct Uvicorn**
+**Option 4: Direct Uvicorn**
 ```bash
-uv run uvicorn main:app --reload
+uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
-Navigate to `http://localhost:8000` in your browser.
 
 ---
 
