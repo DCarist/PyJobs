@@ -7,7 +7,7 @@ def test_index_page(client):
     response = client.get("/")
     assert response.status_code == 200
     assert "PyJobs" in response.text
-    assert "Search Preferences" in response.text
+    assert "Search Profile" in response.text
 
 
 def test_save_preferences(client, db_session):
@@ -26,6 +26,27 @@ def test_save_preferences(client, db_session):
     assert pref is not None
     assert pref.location == "New York, NY"
     assert pref.positions == "Backend Engineer"
+
+
+def test_save_preferences_with_sites_and_remote(client, db_session):
+    response = client.post(
+        "/preferences",
+        data={
+            "location": "Philadelphia, PA, Remote",
+            "positions": "Quality Assurance",
+            "fields": "Six Sigma",
+            "sites": ["linkedin", "indeed"],
+            "is_remote": "true",
+        },
+    )
+    assert response.status_code == 200
+    assert "Preferences saved successfully!" in response.text
+
+    pref = db_session.query(UserPreference).first()
+    assert pref is not None
+    assert pref.location == "Philadelphia, PA, Remote"
+    assert pref.is_remote is True
+    assert "linkedin" in pref.sites
 
 
 def test_search_jobs_missing_preferences(client):
@@ -81,6 +102,34 @@ def test_get_job_detail(client, db_session):
     response = client.get(f"/job/{job.id}")
     assert response.status_code == 200
     assert "Detailed job description here." in response.text
+
+
+def test_get_job_detail_markdown_rendering(client, db_session):
+    markdown_text = (
+        "**Why join us:**\n\n"
+        "**Culture:** Flexible work\\-life balance \\& perks.\n\n"
+        "* Develop strategies\n"
+        "* Lead cross-functional teams"
+    )
+    job = SavedJob(
+        job_id="md-1",
+        site="indeed",
+        title="Category Manager",
+        company="Superior Plus",
+        location="Wayne, PA",
+        job_url="https://example.com/job/md",
+        description=markdown_text,
+    )
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    response = client.get(f"/job/{job.id}")
+    assert response.status_code == 200
+    assert "<strong>Why join us:</strong>" in response.text
+    assert "work-life balance &amp; perks" in response.text
+    assert "<li>Develop strategies</li>" in response.text
+    assert "<li>Lead cross-functional teams</li>" in response.text
 
 
 def test_get_job_detail_not_found(client):

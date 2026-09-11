@@ -1,0 +1,245 @@
+{% if request and request.headers.get('hx-request') %}
+<span class="badge" id="contacts-count-badge" hx-swap-oob="true">{{ contacts|length }}</span>
+{% endif %}
+<div id="application-contacts-container">
+  {% if contacts %}
+  <div class="contacts-list">
+    {% for c in contacts %}
+    <div class="contact-card glass-panel" id="contact-{{ c.id }}">
+      <div class="contact-card-header">
+        <div>
+          <strong class="contact-name">{{ c.name }}</strong>
+          <span class="badge contact-role-badge">{{ c.role }}</span>
+        </div>
+        <div class="contact-card-actions">
+          <button
+            type="button"
+            class="btn-icon-secondary"
+            onclick="const form = document.getElementById('edit-contact-form-{{ c.id }}'); const details = document.getElementById('contact-details-{{ c.id }}'); if (form.style.display === 'none' || form.style.display === '') { form.style.display = 'block'; details.style.display = 'none'; } else { form.style.display = 'none'; details.style.display = 'block'; }"
+            title="Edit contact"
+          >
+            ✏️
+          </button>
+          <button
+            type="button"
+            class="btn-icon-danger"
+            hx-delete="/applications/{{ c.application_id }}/contacts/{{ c.id }}"
+            hx-target="#application-contacts-container"
+            hx-swap="outerHTML"
+            title="Remove contact"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+
+      <div class="contact-card-body" id="contact-details-{{ c.id }}">
+        {% if c.email %}
+        <div class="contact-detail">
+          <span class="contact-icon">✉️</span>
+          <a href="mailto:{{ c.email }}" class="contact-link">{{ c.email }}</a>
+        </div>
+        {% endif %} {% if c.phone %}
+        <div class="contact-detail">
+          <span class="contact-icon">📞</span>
+          <a href="tel:{{ c.phone }}" class="contact-link">{{ c.phone }}</a>
+        </div>
+        {% endif %} {% if c.linkedin_url %}
+        <div class="contact-detail">
+          <span class="contact-icon">🔗</span>
+          <a href="{{ c.linkedin_url }}" target="_blank" class="contact-link external-link"
+            >LinkedIn Profile</a
+          >
+        </div>
+        {% endif %} {% if c.notes %}
+        <p class="contact-notes">{{ c.notes }}</p>
+        {% endif %}
+      </div>
+
+      <!-- Inline Contact Edit Form -->
+      <form
+        id="edit-contact-form-{{ c.id }}"
+        class="edit-contact-form"
+        style="display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);"
+        hx-post="/applications/{{ c.application_id }}/contacts/{{ c.id }}"
+        hx-target="#application-contacts-container"
+        hx-swap="outerHTML"
+      >
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label for="contact-edit-name-{{ c.id }}" style="font-size: 0.8rem;">Full Name *</label>
+            <input
+              type="text"
+              id="contact-edit-name-{{ c.id }}"
+              name="name"
+              value="{{ c.name }}"
+              required
+              style="padding: 0.5rem 0.75rem; font-size: 0.85rem;"
+            >
+          </div>
+          <div class="form-group">
+            <label for="contact-edit-role-{{ c.id }}" style="font-size: 0.8rem;"
+              >Role / Relationship *</label
+            >
+            <select
+              id="contact-edit-role-{{ c.id }}"
+              name="role"
+              style="padding: 0.5rem 0.75rem; font-size: 0.85rem;"
+            >
+              {% for r_val in ['Hiring Manager', 'Recruiter', 'Internal Referral', 'Executive /
+              Leadership', 'HR Representative'] %} {% if c.role == r_val %}
+              <option value="{{ r_val }}" selected>{{ r_val }}</option>
+              {% else %}
+              <option value="{{ r_val }}">{{ r_val }}</option>
+              {% endif %} {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-grid-2" style="margin-top: 0.5rem;">
+          <div class="form-group">
+            <label for="contact-edit-email-{{ c.id }}" style="font-size: 0.8rem;"
+              >Email Address</label
+            >
+            <input
+              type="email"
+              id="contact-edit-email-{{ c.id }}"
+              name="email"
+              value="{{ c.email or '' }}"
+              style="padding: 0.5rem 0.75rem; font-size: 0.85rem;"
+            >
+          </div>
+          <div class="form-group">
+            <label for="contact-edit-phone-{{ c.id }}" style="font-size: 0.8rem;"
+              >Phone Number</label
+            >
+            <input
+              type="tel"
+              id="contact-edit-phone-{{ c.id }}"
+              name="phone"
+              value="{{ c.phone or '' }}"
+              style="padding: 0.5rem 0.75rem; font-size: 0.85rem;"
+            >
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 0.5rem;">
+          <label for="contact-edit-linkedin-{{ c.id }}" style="font-size: 0.8rem;"
+            >LinkedIn URL</label
+          >
+          <input
+            type="url"
+            id="contact-edit-linkedin-{{ c.id }}"
+            name="linkedin_url"
+            value="{{ c.linkedin_url or '' }}"
+            style="padding: 0.5rem 0.75rem; font-size: 0.85rem;"
+          >
+        </div>
+
+        <div class="form-group" style="margin-top: 0.5rem;">
+          <label for="contact-edit-notes-{{ c.id }}" style="font-size: 0.8rem;"
+            >Context / Notes</label
+          >
+          <textarea
+            id="contact-edit-notes-{{ c.id }}"
+            name="notes"
+            rows="2"
+            style="padding: 0.5rem 0.75rem; font-size: 0.85rem;"
+          >{{ c.notes or '' }}</textarea>
+        </div>
+
+        <div style="margin-top: 0.75rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
+          <button
+            type="button"
+            class="btn-secondary btn-tiny"
+            onclick="document.getElementById('edit-contact-form-{{ c.id }}').style.display = 'none'; document.getElementById('contact-details-{{ c.id }}').style.display = 'block';"
+          >
+            Cancel
+          </button>
+          <button type="submit" class="btn-primary btn-tiny">Save Changes</button>
+        </div>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div
+    class="empty-contacts"
+    style="padding: 1rem 0; color: var(--text-secondary); font-size: 0.875rem;"
+  >
+    No contacts added yet. Record recruiters, hiring managers, or company referrals below.
+  </div>
+  {% endif %}
+
+  <!-- Add Contact Form -->
+  <details class="add-contact-accordion" style="margin-top: 1rem;">
+    <summary class="add-contact-summary">
+      <span>+ Add New Contact</span>
+    </summary>
+    <form
+      class="contact-form glass-panel"
+      style="margin-top: 0.75rem; padding: 1rem;"
+      hx-post="/applications/{{ application.id }}/contacts"
+      hx-target="#application-contacts-container"
+      hx-swap="outerHTML"
+    >
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label for="contact-name-input">Full Name *</label>
+          <input
+            type="text"
+            id="contact-name-input"
+            name="name"
+            required
+            placeholder="e.g. Sarah Jenkins"
+          >
+        </div>
+        <div class="form-group">
+          <label for="contact-role-select">Role / Relationship *</label>
+          <select id="contact-role-select" name="role">
+            <option value="Hiring Manager">Hiring Manager</option>
+            <option value="Recruiter">Recruiter / Talent Acquisition</option>
+            <option value="Internal Referral">Internal Referral / Colleague</option>
+            <option value="Executive / Leadership">Executive / Leadership</option>
+            <option value="HR Representative">HR Representative</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-grid-2" style="margin-top: 0.75rem;">
+        <div class="form-group">
+          <label for="contact-email-input">Email Address</label>
+          <input type="email" id="contact-email-input" name="email" placeholder="sarah@company.com">
+        </div>
+        <div class="form-group">
+          <label for="contact-phone-input">Phone Number</label>
+          <input type="tel" id="contact-phone-input" name="phone" placeholder="(555) 000-0000">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top: 0.75rem;">
+        <label for="contact-linkedin-input">LinkedIn URL</label>
+        <input
+          type="url"
+          id="contact-linkedin-input"
+          name="linkedin_url"
+          placeholder="https://linkedin.com/in/username"
+        >
+      </div>
+
+      <div class="form-group" style="margin-top: 0.75rem;">
+        <label for="contact-notes-input">Context / Notes</label>
+        <textarea
+          id="contact-notes-input"
+          name="notes"
+          rows="2"
+          placeholder="e.g. Met at tech conference, referred me for this posting"
+        ></textarea>
+      </div>
+
+      <div style="margin-top: 1rem; text-align: right;">
+        <button type="submit" class="btn-primary btn-small">Save Contact</button>
+      </div>
+    </form>
+  </details>
+</div>

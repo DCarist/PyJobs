@@ -21,10 +21,128 @@ uv tool install ty
 ```
 
 ### Running the Application
-```bash
-uv run uvicorn main:app --reload
+
+**Option 1: One-Click Local Launcher (This Machine Only)**
+Double-click `run.bat` in the project root. It will start the server on `127.0.0.1:8000` and automatically open PyJobs in your default web browser.
+
+**Option 2: One-Click Local Network Launcher (Other Devices on LAN)**
+Double-click `run_network.bat` in the project root. It binds to `0.0.0.0:8000`, automatically detects your machine's primary Wi-Fi/Ethernet LAN IP, and displays the direct access link:
+```text
+===================================================
+             PyJobs Local Network Server
+===================================================
+  * Local machine:  http://localhost:8000
+  * Local IP:       http://127.0.0.1:8000
+  * LAN Network:    http://192.168.1.X:8000
+---------------------------------------------------
+  Connect any device on the same local Wi-Fi or LAN.
+  Press Ctrl+C in this terminal to stop the server.
+===================================================
 ```
-Navigate to `http://localhost:8000` in your browser.
+Other laptops, smartphones, or tablets on the same local Wi-Fi can navigate directly to `http://<LAN_IP>:8000`.
+
+**Option 3: CLI Commands**
+```bash
+# Standard local mode
+uv run pyjobs
+
+# Local network mode (accessible across LAN)
+uv run python run.py --network
+
+# Custom port or interface
+uv run python run.py --host 0.0.0.0 --port 8080
+```
+
+**Option 4: Direct Uvicorn**
+```bash
+uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+---
+
+## Job Board Scraping & Location Syntax
+
+### Supported Job Boards & Anti-Bot Protections
+* **LinkedIn (`linkedin`)**: Highly reliable, returns rich job postings, titles, and companies rapidly. *(Active by default)*
+* **Indeed (`indeed`)**: High volume, comprehensive coverage. Requires `country_indeed="usa"`. *(Active by default)*
+* **Google Jobs (`google`)**: Aggregates postings from direct employer sites and job boards. *(Active by default)*
+* **ZipRecruiter (`zip_recruiter`)**: Uses mobile API endpoints protected by Cloudflare WAF (`403 forbidden aa`). Deselected by default; requires residential proxies.
+* **Glassdoor (`glassdoor`)**: Location lookup and GraphQL endpoints are protected by Cloudflare bot management (`400 location not parsed` / `403`). Deselected by default; requires residential proxies.
+
+### Multi-Location & Remote Syntax
+The Location input supports flexible, multi-target parsing:
+* **Single City**: `Philadelphia`
+* **City & State**: `Philadelphia, PA`
+* **Multiple Cities**: `Philadelphia, PA; New York, NY` or `Philadelphia, PA, Boston, MA`
+* **Remote Keywords**: `Philadelphia, PA, Remote` or `Remote` (or check the *Include Remote* box).
+
+### Optional Proxy Configuration
+To route scraper requests (especially for ZipRecruiter and Glassdoor) through proxy pools, set the `JOBSPY_PROXIES` environment variable:
+```bash
+# Comma-separated list or single proxy URL
+set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
+```
+
+---
+
+## Search Profiles & Async Ingestion
+
+### Multi-Query Search Profiles (`/profiles`)
+* **Targeted Query Management**: Save independent search profiles with customized parameters:
+  * Profile Name, Position Titles, and Required Skills/Fields.
+  * Geographic Location, Search Radius (miles), and Remote Toggle.
+  * Target Job Boards (`linkedin`, `indeed`, `google`, `zip_recruiter`, `glassdoor`).
+  * Desired Result Count & Max Posting Age (days).
+* **Sidebar Profile Switcher**: Switch active profiles seamlessly or create new profiles directly in the dashboard sidebar.
+* **Feed Filtering by Profile**: Filter the main jobs feed to inspect opportunities discovered by specific profiles or view all aggregated jobs.
+
+### Asynchronous Scraping & Live Progress (`/scrape/start`, `/scrape/status/{task_id}`)
+* **Non-Blocking Execution**: Scrapes run asynchronously in background worker threads without freezing the UI or HTTP server.
+* **Live Progress Tracking**: HTMX polling indicator displays real-time progress percentages and status updates.
+* **4-Pillar Metric Summary**: Completion feedback highlighting:
+  * **Newly Added**: Fresh job postings inserted into SQLite.
+  * **Metadata Refreshed**: Postings re-encountered with updated salaries or descriptions.
+  * **Aging (30d+)**: Postings that have passed the staleness threshold.
+  * **Hidden Postings**: Postings currently filtered out or auto-hidden.
+* **Instant Feed Refresh**: Out-of-band DOM swap immediately updates the job results view upon scrape completion.
+
+### Automated Scheduling & Background Refresh
+* **Per-Profile Intervals**: Configure automated background refreshes every 1, 6, 12, or 24 hours.
+* **Launch Check**: Mark profiles to scrape immediately on application launch (`refresh_on_launch`).
+* **In-App Scheduler**: Lightweight asyncio lifespan scheduler checks eligible profiles without requiring external cron daemons.
+
+### Posting Staleness & Expiration Management
+* **Age-Based Staleness Badge**: Postings 30+ days old automatically display an amber `Stale (30d+)` badge.
+* **Dead Link Verification**: Postings verified as dead/404 via HTTP `HEAD` checks show a red `Dead Link` warning.
+* **1-Click Bulk Auto-Hide**: Hide all stale postings with a single click to keep your active pipeline clean.
+* **Active vs. Stale Filtering**: Main feed filters allow viewing `All Postings`, `Active Only`, or `Stale Only`.
+
+---
+
+## Application Tracking & Unemployment Compliance
+
+### Application Pipeline (`/applications`)
+* **1-Click Feed Tracking**: Track jobs directly from the curated feed with automatic follow-up dates (+14 days) and audit logging.
+* **Interactive Kanban Board**: Visual drag-and-drop workflow across 6 pipeline stages:
+  * `📌 Saved / To Apply`
+  * `✉️ Applied`
+  * `📞 Phone Screen`
+  * `💼 Interviewing`
+  * `🎉 Offer Received`
+  * `📁 Closed / Archived` (Rejected, Withdrawn, Cancelled)
+* **Detailed Table View**: Filterable table with quick stage dropdowns, contact counters, follow-up dates, and direct management links.
+* **Follow-Up Reminders**: Visual indicators for `Due Today`, `Overdue`, and `Upcoming` follow-ups.
+* **Application Detail Command Center (`/applications/{id}`)**:
+  * **Key Contacts**: 1-to-many relationship tracking recruiters, hiring managers, and internal referrals with email, phone, and LinkedIn URLs.
+  * **Activity Timeline**: Reverse-chronological audit log capturing status transitions, interview prep notes, and outreach.
+  * **Job Description Snapshot**: Manually editable snapshot preserving the original posting text even if the live posting expires.
+* **External Application Modal**: Log jobs applied to outside the feed (e.g. company careers portals, job fairs, direct emails).
+
+### Unemployment Work-Search Audit Log (`/applications/unemployment-report`)
+* **Weekly Claim Certification**: Automatically aggregates all application submissions, phone screens, interviews, and contacts into Saturday week-ending periods.
+* **Compliance Standards**: Highlights whether each claim period meets the standard 3+ work-search activities requirement with visual badges.
+* **Audit Documentation**: Captures applicant portal creation, portal usernames, and confirmation numbers as official proof for state unemployment audits.
+* **Export & Print**: Dedicated print-to-PDF stylesheet and instant CSV export for submitting weekly claims.
 
 ---
 
@@ -49,6 +167,10 @@ To check only staged files (used by the pre-commit hook):
 ```powershell
 powershell -ExecutionPolicy Bypass -File ./scripts/check.ps1 -Staged
 ```
+
+### Agent Lifecycle Hooks & Modular Rules
+* **PostToolUse Hook (`.agents/hooks.json`)**: Automatically auto-fixes formatting (Ruff, Biome) and validates types (Ty) whenever an AI agent modifies code via `scripts/hook_post_tool.py`.
+* **Modular Project Rules (`.agents/rules/`)**: Scoped rules covering workflow conventions, Python backend standards, HTMX frontend best practices, and branch-completion audits.
 
 ---
 

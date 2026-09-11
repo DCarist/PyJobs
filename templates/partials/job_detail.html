@@ -1,15 +1,18 @@
-<div class="job-details">
-  <div style="margin-bottom: 1rem;">
-    <strong>Description:</strong><br>
-    {% if job.description %} {{ job.description | replace('\n', '<br>') | safe }} {% else %}
-    <em>No description available.</em>
+<div class="job-details-panel glass-panel">
+  <div class="job-details-header">
+    <span class="details-heading">Role Description</span>
+    <button
+      type="button"
+      class="btn-subtle btn-small"
+      onclick="closeJobDetails('{{ job.id }}')"
+      title="Close details"
+    >
+      ✕ Close
+    </button>
+  </div>
+  <div class="job-description-content markdown-body">
+    {% if job.description %} {{ job.description | render_markdown | safe }} {% else %}
+    <em class="no-description">No description available for this posting.</em>
     {% endif %}
   </div>
-  <button
-    type="button"
-    class="btn-secondary btn-small"
-    onclick="document.getElementById('job-details-{{ job.id }}').innerHTML = '';"
-  >
-    Close Details
-  </button>
 </div>

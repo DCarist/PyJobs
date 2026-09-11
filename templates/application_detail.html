@@ -1,0 +1,325 @@
+{% extends "base.html" %} {% block content %}
+<div class="application-detail-page">
+  <!-- Top Navigation & Back Link -->
+  <div class="detail-header-nav">
+    <a href="/applications" class="back-link">
+      <span>← Back to Application Pipeline</span>
+    </a>
+    <div class="detail-top-actions">
+      {% if application.job_url %}
+      <a
+        href="{{ application.job_url }}"
+        target="_blank"
+        class="btn-secondary btn-small external-link"
+      >
+        <span>Open Original Posting ↗</span>
+      </a>
+      {% endif %}
+      <form
+        method="post"
+        action="/applications/{{ application.id }}/delete"
+        onsubmit="return confirm('Are you sure you want to delete this tracked application?');"
+      >
+        <button type="submit" class="btn-delete-app">Delete Application</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Primary Application Banner -->
+  <div class="glass-panel detail-hero-banner">
+    <div class="hero-info">
+      <div class="hero-badges">
+        <span class="badge stage-badge stage-{{ application.status }}">
+          ● {{ application.status|capitalize }}
+        </span>
+        <span class="badge method-badge"> 🌐 {{ application.method }} </span>
+        {% if application.salary_stated %}
+        <span class="badge salary-badge"> 💰 {{ application.salary_stated }} </span>
+        {% endif %}
+      </div>
+      <h2 class="detail-title">{{ application.title or "Untitled Position" }}</h2>
+      <h3 class="detail-company">
+        {{ application.company }} {% if application.location %}
+        <span class="detail-location">· 📍 {{ application.location }}</span>
+        {% endif %}
+      </h3>
+    </div>
+
+    <!-- Interactive Status Pipeline Stepper -->
+    <div class="pipeline-stepper-container">
+      <div class="stepper-label">Application Stage:</div>
+      <div class="pipeline-stepper">
+        {% set stages = [ ('saved', 'Saved'), ('applied', 'Applied'), ('screening', 'Screening'),
+        ('interviewing', 'Interviewing'), ('offer', 'Offer'), ('rejected', 'Rejected'),
+        ('cancelled', 'Cancelled') ] %} {% for stage_id, stage_name in stages %}
+        <form
+          hx-post="/applications/{{ application.id }}/status"
+          hx-target="body"
+          hx-swap="outerHTML"
+          class="stepper-form"
+        >
+          <input type="hidden" name="new_status" value="{{ stage_id }}">
+          {% if application.status == stage_id %}
+          <button type="submit" class="stepper-step active-step" title="Move to {{ stage_name }}">
+            <span class="step-dot"></span>
+            <span class="step-text">{{ stage_name }}</span>
+          </button>
+          {% else %}
+          <button type="submit" class="stepper-step" title="Move to {{ stage_name }}">
+            <span class="step-dot"></span>
+            <span class="step-text">{{ stage_name }}</span>
+          </button>
+          {% endif %}
+        </form>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Two-Column Command Center Grid -->
+  <div class="detail-grid">
+    <!-- Left Column: Details, Contacts, Portal Account -->
+    <div class="detail-col-left">
+      <!-- Follow-up & Compliance Settings -->
+      <div class="glass-panel detail-card">
+        <h3 class="card-title">⏰ Follow-up & Compliance</h3>
+        <form method="post" action="/applications/{{ application.id }}">
+          <div class="form-group">
+            <label for="applied-date-input">Date Applied</label>
+            <input
+              type="date"
+              id="applied-date-input"
+              name="applied_date"
+              value="{{ application.applied_date.strftime('%Y-%m-%d') if application.applied_date else '' }}"
+            >
+          </div>
+
+          <div class="form-group" style="margin-top: 0.85rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <label for="follow-up-date-input" style="margin: 0;">Follow-up Reminder Date</label>
+              <button
+                type="button"
+                class="btn-secondary btn-tiny"
+                onclick="
+                  const d = new Date();
+                  d.setDate(d.getDate() + 14);
+                  document.getElementById('follow-up-date-input').value = d.toISOString().split('T')[0];
+                "
+                title="Quick set to 14 days from today"
+              >
+                +2 Weeks
+              </button>
+            </div>
+            <input
+              type="date"
+              id="follow-up-date-input"
+              name="follow_up_date"
+              value="{{ application.follow_up_date.strftime('%Y-%m-%d') if application.follow_up_date else '' }}"
+              style="margin-top: 0.35rem;"
+            >
+          </div>
+
+          <div class="form-group" style="margin-top: 0.85rem;">
+            <label for="method-input">Application Method</label>
+            <select id="method-input" name="method">
+              {% for m in ['Company Website', 'LinkedIn', 'Indeed', 'Google Jobs', 'Referral',
+              'Recruiter', 'Email', 'Other'] %} {% if application.method == m %}
+              <option value="{{ m }}" selected>{{ m }}</option>
+              {% else %}
+              <option value="{{ m }}">{{ m }}</option>
+              {% endif %} {% endfor %}
+            </select>
+          </div>
+
+          <!-- Applicant Portal Account Section -->
+          <div class="portal-section glass-panel" style="margin-top: 1rem; padding: 0.85rem;">
+            <label
+              class="checkbox-label"
+              for="account-created-check"
+              style="display: flex; align-items: center; gap: 0.5rem;"
+            >
+              {% if application.account_created %}
+              <input
+                type="checkbox"
+                id="account-created-check"
+                name="account_created"
+                value="true"
+                checked
+              >
+              {% else %}
+              <input type="checkbox" id="account-created-check" name="account_created" value="true">
+              {% endif %}
+              <span style="font-weight: 500;">Applicant Portal Account Created</span>
+            </label>
+
+            <div class="form-group" style="margin-top: 0.65rem;">
+              <label for="portal-username-input" style="font-size: 0.8rem;"
+                >Portal Username / Email</label
+              >
+              <input
+                type="text"
+                id="portal-username-input"
+                name="portal_username"
+                value="{{ application.portal_username or '' }}"
+                placeholder="e.g. yourname@gmail.com"
+              >
+            </div>
+
+            <div class="form-group" style="margin-top: 0.65rem;">
+              <label for="confirmation-input" style="font-size: 0.8rem;"
+                >Confirmation / Application ID (Unemployment Proof)</label
+              >
+              <input
+                type="text"
+                id="confirmation-input"
+                name="confirmation_number"
+                value="{{ application.confirmation_number or '' }}"
+                placeholder="e.g. REQ-10492"
+              >
+            </div>
+          </div>
+
+          <div style="margin-top: 1rem; text-align: right;">
+            <button type="submit" class="btn-primary btn-small">Save Settings</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Key Contacts Card (1-to-many relationship) -->
+      <div class="glass-panel detail-card" style="margin-top: 1.5rem;">
+        <div class="card-header-with-count">
+          <h3 class="card-title" style="margin: 0;">👥 Key Contacts</h3>
+          <span class="badge" id="contacts-count-badge">{{ contacts|length }}</span>
+        </div>
+        <div style="margin-top: 0.85rem;">{% include "partials/application_contacts.html" %}</div>
+      </div>
+    </div>
+
+    <!-- Right Column: Timeline Log & Job Description -->
+    <div class="detail-col-right">
+      <!-- Activity Timeline & Notes -->
+      <div class="glass-panel detail-card">
+        <h3 class="card-title">📝 Activity & Interaction Timeline</h3>
+        <p class="section-subtitle" style="margin-bottom: 1rem;">
+          Chronological record of status changes, recruiter calls, and interview preparation notes.
+        </p>
+
+        <!-- Add Activity Form -->
+        <form
+          hx-post="/applications/{{ application.id }}/activities"
+          hx-target="#activity-timeline"
+          hx-swap="outerHTML"
+          class="activity-form glass-panel"
+          style="padding: 0.85rem; margin-bottom: 1.25rem;"
+        >
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="activity-type-select">Activity Type</label>
+              <select id="activity-type-select" name="activity_type">
+                <option value="note">General Note / Update</option>
+                <option value="interview">Interview / Screen Prep</option>
+                <option value="contact">Recruiter / Manager Contact</option>
+                <option value="follow_up">Follow-up Email Sent</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="activity-date-input">Date</label>
+              <input
+                type="date"
+                id="activity-date-input"
+                name="activity_date"
+                value="{{ today.strftime('%Y-%m-%d') }}"
+              >
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 0.65rem;">
+            <label for="activity-note-input">Notes & Discussion Details *</label>
+            <textarea
+              id="activity-note-input"
+              name="note"
+              required
+              rows="2"
+              placeholder="e.g. Phone screen with Sarah (recruiter); discussed compensation range and team stack..."
+            ></textarea>
+          </div>
+
+          <div style="margin-top: 0.75rem; text-align: right;">
+            <button type="submit" class="btn-primary btn-small">Log Activity</button>
+          </div>
+        </form>
+
+        <!-- Timeline container -->
+        {% include "partials/activity_timeline.html" %}
+      </div>
+
+      <!-- Cached Job Description (Manually Editable) -->
+      <div class="glass-panel detail-card" style="margin-top: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h3 class="card-title" style="margin: 0;">📄 Job Description Snapshot</h3>
+          <button
+            type="button"
+            class="btn-secondary btn-tiny"
+            onclick="
+              const box = document.getElementById('desc-edit-box');
+              const view = document.getElementById('desc-view-box');
+              if (box.style.display === 'none') {
+                box.style.display = 'block';
+                view.style.display = 'none';
+              } else {
+                box.style.display = 'none';
+                view.style.display = 'block';
+              }
+            "
+          >
+            Edit / Update
+          </button>
+        </div>
+
+        <div id="desc-view-box" style="margin-top: 0.85rem;">
+          {% if application.description %}
+          <div
+            class="job-description-content markdown-body"
+            style="max-height: 380px; overflow-y: auto;"
+          >
+            {{ application.description | render_markdown | safe }}
+          </div>
+          {% else %}
+          <div style="color: var(--text-secondary); font-size: 0.875rem; padding: 1rem 0;">
+            No description was captured. Click "Edit / Update" to paste the role responsibilities or
+            job posting text.
+          </div>
+          {% endif %}
+        </div>
+
+        <div id="desc-edit-box" style="display: none; margin-top: 0.85rem;">
+          <form method="post" action="/applications/{{ application.id }}/description">
+            <div class="form-group">
+              <label for="desc-textarea">Job Description Text</label>
+              <textarea
+                id="desc-textarea"
+                name="description"
+                rows="8"
+                style="font-family: inherit; font-size: 0.875rem;"
+                placeholder="Paste original job description or notes..."
+              >{{ application.description or '' }}</textarea>
+            </div>
+            <div
+              style="margin-top: 0.75rem; display: flex; justify-content: flex-end; gap: 0.5rem;"
+            >
+              <button
+                type="button"
+                class="btn-secondary btn-small"
+                onclick="document.getElementById('desc-edit-box').style.display='none'; document.getElementById('desc-view-box').style.display='block';"
+              >
+                Cancel
+              </button>
+              <button type="submit" class="btn-primary btn-small">Save Description</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

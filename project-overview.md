@@ -25,27 +25,48 @@ graph TD
 ```
 
 1. **Entrypoint & Routing (`main.py`)**:
-   * `GET /`: Serves dashboard (`index.html`) with stored user preferences.
+   * `GET /`: Serves discovery dashboard (`index.html`) with stored user preferences and saved jobs.
    * `POST /preferences`: Persists search keywords, location, and fields in SQLite; returns updated form partial (`preferences_form.html`).
    * `POST /search`: Triggers `fetch_jobs()`, deduplicates against existing records via `job_id`, inserts newly found jobs, and returns `job_results.html`.
-   * `GET /job/{id}` & `DELETE /job/{id}`: View details or remove job cards from the UI via HTMX DOM replacement.
+   * `GET /jobs/filter` & `GET /jobs/export`: Filter jobs by keyword, seniority, salary bracket, board, and date range; export to CSV, Excel, or JSON.
+   * `POST /job/{id}/track`: 1-click tracking of a saved job posting into an active `JobApplication`.
+   * `GET /applications`: Applications dashboard with interactive Drag & Drop Kanban board and Table view.
+   * `POST /applications`: Manual external application logging via modal.
+   * `POST /applications/{id}/status`: Updates application pipeline stage with automated audit logging.
+   * `GET /applications/{id}`: Follow-up command center with key contacts, activity timeline, and job description editing.
+   * `GET /applications/unemployment-report`: Certified weekly work-search compliance log with print-to-PDF styles and CSV export.
 2. **Data Models (`models.py`)**:
-   * `UserPreference`: Stores target position keywords, location, and industry fields.
-   * `SavedJob`: Stores scraped metadata (title, company, salary source, posting date, original URL, description).
-3. **Database Connection (`database.py`)**:
-   * Standard SQLite connection with thread checking disabled for FastAPI compatibility.
+   * `UserPreference`: Stores target position keywords, location, industry fields, active job board selections (`sites`), and remote flag (`is_remote`).
+   * `SavedJob`: Stores scraped metadata (title, company, salary source, posting date, original URL, description, seniority, salary bracket).
+   * `JobApplication`: Tracks status, applied date, method, portal account creation, username, confirmation numbers, and follow-up dates.
+   * `ApplicationContact`: 1-to-many relationship capturing recruiters, hiring managers, and referrals for an application.
+   * `ApplicationActivity`: Reverse-chronological timeline logging status transitions, recruiter notes, and interview prep.
+3. **Database Connection & Migration (`database.py`)**:
+   * SQLite connection with thread checking disabled for FastAPI compatibility.
+   * `init_db()` automatically provisions tables and applies column migrations for existing SQLite databases.
+   * `sync_job_classifications()` dynamically repairs and syncs seniority levels and salary brackets.
+4. **Scraping Engine & Location Intelligence (`scraper.py`)**:
+   * `parse_locations()` parses flexible input formats (single city, City/State, multi-city semicolon/comma lists, remote keywords).
+   * Aggregates postings across selected boards with cross-batch deduplication by `job_id` and composite key.
+   * **Job Board Landscape & Anti-Bot Protection**:
+     * **LinkedIn**: Fast, highly reliable, rich job details (active by default).
+     * **Indeed**: High volume; requires `country_indeed="usa"` (active by default).
+     * **Google Jobs**: Aggregated company sites and job postings (active by default).
+     * **ZipRecruiter**: API protected by Cloudflare WAF (`403 forbidden aa`); requires residential proxies.
+     * **Glassdoor**: Protected by Cloudflare bot management (`400 location not parsed` / `403`); requires residential proxies.
 
 ---
 
-### 1.3 Baseline Diagnostic Audit (Current Issues Found)
+### 1.3 Quality Gate & Test Status
 
 | Tool | Status | Details |
 | :--- | :--- | :--- |
-| **`ruff check .`** | **1 error** | Unused import `Boolean` in `models.py:1`. |
-| **`ty check .`** | **5 diagnostics** | `models.py` uses legacy SQLAlchemy 1.x `Column(String)` syntax rather than SQLAlchemy 2.0 `Mapped[...] = mapped_column(...)`. In `main.py:53-75`, `ty` detects invalid assignments and type mismatches (`ColumnElement[str]` passed where `str` is expected). |
-| **`biome check`** | **4 errors + formatting** | Missing `type="button"` attributes on buttons in `templates/index.html`, `job_detail.html`, and `job_results.html`; indentation formatting in `styles.css`. |
-| **`pytest`** | **0 tests** | No automated tests exist currently. |
-| **Git Branch** | **master vs main** | Current branch is `master`, whereas our workflow will standardize on `main`. |
+| **`ruff check .`** | **0 errors** | Clean across all Python modules. |
+| **`ruff format --check .`** | **0 errors** | 100% formatted. |
+| **`ty check .`** | **0 diagnostics** | Full SQLAlchemy 2.0 `Mapped[T]` and TypedDict type safety. |
+| **`biome check`** | **0 errors** | Biome-compliant HTML, CSS, and JS with explicit `type="button"` attributes. |
+| **`pytest`** | **45 passing** | Sub-second hermetic test suite across `test_applications.py`, `test_curation.py`, `test_launcher.py`, `test_routes.py`, `test_scraper.py`. |
+| **Git Branches** | **Standardized** | Feature workflow branching from `main` / `dev`. |
 
 ---
 
