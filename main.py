@@ -1,14 +1,18 @@
+from __future__ import annotations
+
 import datetime
 import io
 import os
 import re
+import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, TypedDict
 
 import markdown
 import pandas as pd
-from fastapi import Depends, FastAPI, Form, Request, Response
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import Depends, FastAPI, File, Form, Request, Response, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import or_
@@ -20,9 +24,17 @@ from models import (
     ApplicationActivity,
     ApplicationContact,
     JobApplication,
+    Resume,
+    ResumeVersion,
     SavedJob,
     SearchProfile,
     UserPreference,
+)
+from resume_parser import (
+    convert_docx_to_pdf,
+    extract_text,
+    generate_download_filename,
+    score_resume_match,
 )
 from scheduler import start_scheduler, stop_scheduler
 from scraper import check_job_url_liveness, evaluate_job_staleness, fetch_jobs
@@ -76,6 +88,32 @@ os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 templates.env.filters["render_markdown"] = render_markdown
+
+
+def get_upload_dir(app_instance: FastAPI | None = None) -> Path:
+    """Returns the storage path for resume uploads, supporting test overrides."""
+    if app_instance and hasattr(app_instance.state, "upload_dir") and app_instance.state.upload_dir:
+        p = Path(app_instance.state.upload_dir)
+    else:
+        p = Path(os.environ.get("PYJOBS_UPLOAD_DIR", "uploads/resumes"))
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def find_matching_resumes(
+    db: Session, job_title: str, job_description: str | None = None
+) -> list[tuple[Resume, float]]:
+    """Returns resumes scored and ordered by match relevance to the given job."""
+    resumes = db.query(Resume).all()
+    scored: list[tuple[Resume, float]] = []
+    for r in resumes:
+        if not r.versions:
+            continue
+        score = score_resume_match(r.title, r.tags, job_title, job_description)
+        if score > 0.0:
+            scored.append((r, score))
+    scored.sort(key=lambda item: item[1], reverse=True)
+    return scored
 
 
 # Dependency
@@ -862,6 +900,12 @@ async def track_job(request: Request, id: int, db: Session = Depends(get_db)):
         method = job.site.capitalize() if job.site else "Company Website"
         salary = job.salary_bracket if job.salary_bracket != "Unspecified" else job.salary_source
 
+        # Check for matching resume to pre-attach
+        matched = find_matching_resumes(db, job.title, job.description)
+        suggested_rv_id = None
+        if matched and matched[0][1] >= 0.2 and matched[0][0].versions:
+            suggested_rv_id = matched[0][0].versions[0].id
+
         app_record = JobApplication(
             saved_job_id=job.id,
             title=job.title,
@@ -874,6 +918,7 @@ async def track_job(request: Request, id: int, db: Session = Depends(get_db)):
             applied_date=today,
             method=method,
             follow_up_date=follow_up,
+            resume_version_id=suggested_rv_id,
         )
         db.add(app_record)
         db.flush()
@@ -997,6 +1042,8 @@ async def applications_dashboard(
         },
     ]
 
+    all_resumes = db.query(Resume).order_by(Resume.title.asc()).all()
+
     context = {
         "request": request,
         "applications": applications,
@@ -1008,6 +1055,7 @@ async def applications_dashboard(
         "today": today,
         "default_follow_up": default_follow_up,
         "active_page": "applications",
+        "resumes": all_resumes,
     }
 
     if request.headers.get("HX-Target") == "applications-content":
@@ -1036,6 +1084,7 @@ async def create_manual_application(
     portal_username: str = Form(""),
     confirmation_number: str = Form(""),
     description: str = Form(""),
+    resume_version_id: int | None = Form(None),
     db: Session = Depends(get_db),
 ):
     """Manually logs an external application for complete tracking and unemployment audits."""
@@ -1072,6 +1121,7 @@ async def create_manual_application(
         portal_username=portal_username.strip() or None,
         confirmation_number=confirmation_number.strip() or None,
         description=description.strip() or None,
+        resume_version_id=resume_version_id,
     )
     db.add(app_record)
     db.flush()
@@ -1303,6 +1353,9 @@ async def get_application_detail(request: Request, id: int, db: Session = Depend
         return HTMLResponse("Application not found.", status_code=404)
 
     today = datetime.date.today()
+    all_resumes = db.query(Resume).order_by(Resume.title.asc()).all()
+    matching_resumes = find_matching_resumes(db, app_record.title, app_record.description)
+
     return templates.TemplateResponse(
         request=request,
         name="application_detail.html",
@@ -1312,6 +1365,8 @@ async def get_application_detail(request: Request, id: int, db: Session = Depend
             "activities": app_record.activities,
             "today": today,
             "active_page": "applications",
+            "resumes": all_resumes,
+            "matching_resumes": matching_resumes,
         },
     )
 
@@ -1325,6 +1380,7 @@ async def update_application_detail(
     account_created: bool = Form(False),
     portal_username: str = Form(""),
     confirmation_number: str = Form(""),
+    resume_version_id: int | None = Form(None),
     db: Session = Depends(get_db),
 ):
     """Saves follow-up and compliance settings on the detail page."""
@@ -1352,6 +1408,7 @@ async def update_application_detail(
     app_record.account_created = account_created
     app_record.portal_username = portal_username.strip() or None
     app_record.confirmation_number = confirmation_number.strip() or None
+    app_record.resume_version_id = resume_version_id
 
     db.commit()
     return RedirectResponse(url=f"/applications/{id}", status_code=303)
@@ -1562,3 +1619,384 @@ async def add_application_activity(
         name="partials/activity_timeline.html",
         context={"activities": app_record.activities},
     )
+
+
+# ==============================================================================
+# Resume Management & Versioning System
+# ==============================================================================
+
+
+@app.get("/resumes", response_class=HTMLResponse)
+async def list_resumes(
+    request: Request,
+    tag: str = "all",
+    q: str = "",
+    db: Session = Depends(get_db),
+):
+    """Resume Management Dashboard with tag filtering and version history."""
+    query = db.query(Resume)
+    if tag and tag != "all":
+        query = query.filter(Resume.tags.ilike(f"%{tag}%"))
+    if q and q.strip():
+        term = f"%{q.strip()}%"
+        query = query.filter(
+            or_(
+                Resume.title.ilike(term),
+                Resume.description.ilike(term),
+                Resume.tags.ilike(term),
+            )
+        )
+    resumes = query.order_by(Resume.updated_at.desc(), Resume.id.desc()).all()
+
+    # Collect distinct tags
+    all_resumes = db.query(Resume).all()
+    unique_tags: set[str] = set()
+    for r in all_resumes:
+        if r.tags:
+            for t in r.tags.split(","):
+                clean = t.strip()
+                if clean:
+                    unique_tags.add(clean)
+    sorted_tags = sorted(unique_tags, key=str.lower)
+
+    pref = db.query(UserPreference).first()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="resumes.html",
+        context={
+            "resumes": resumes,
+            "active_page": "resumes",
+            "active_tag": tag,
+            "q": q,
+            "tags": sorted_tags,
+            "pref": pref,
+            "today": datetime.date.today(),
+        },
+    )
+
+
+@app.post("/resumes")
+async def create_resume(
+    request: Request,
+    title: str = Form(...),
+    description: str = Form(""),
+    tags: str = Form(""),
+    change_notes: str = Form("Initial upload"),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Uploads and registers a new resume with its initial version (v1)."""
+    if not file.filename:
+        return HTMLResponse("No file selected.", status_code=400)
+
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if ext not in ("pdf", "docx"):
+        return HTMLResponse(
+            "Unsupported file format. Please upload a .pdf or .docx document.",
+            status_code=400,
+        )
+
+    content = await file.read()
+    if not content:
+        return HTMLResponse("Uploaded file is empty.", status_code=400)
+
+    upload_dir = get_upload_dir(request.app)
+    file_id = uuid.uuid4().hex
+    stored_original = f"{file_id}.{ext}"
+    file_path = upload_dir / stored_original
+    file_path.write_bytes(content)
+
+    # If DOCX, compile to PDF
+    if ext in ("docx", "doc"):
+        pdf_stored = f"{file_id}.pdf"
+        pdf_path = upload_dir / pdf_stored
+        converted = convert_docx_to_pdf(file_path, pdf_path)
+        if not converted or not pdf_path.exists():
+            pdf_path = file_path
+    else:
+        pdf_path = file_path
+
+    extracted_text = extract_text(file_path, ext)
+
+    resume = Resume(
+        title=title.strip(),
+        description=description.strip() or None,
+        tags=tags.strip(),
+    )
+    db.add(resume)
+    db.flush()
+
+    version = ResumeVersion(
+        resume_id=resume.id,
+        version_number=1,
+        original_filename=file.filename,
+        file_path=str(file_path),
+        pdf_path=str(pdf_path),
+        file_size=len(content),
+        file_type=ext,
+        extracted_text=extracted_text,
+        change_notes=change_notes.strip() or "Initial upload",
+    )
+    db.add(version)
+    db.commit()
+
+    return RedirectResponse(url="/resumes", status_code=303)
+
+
+@app.post("/resumes/{id}/versions")
+async def upload_resume_version(
+    request: Request,
+    id: int,
+    change_notes: str = Form(""),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Uploads a subsequent version (v2, v3, etc.) for an existing resume."""
+    resume = db.query(Resume).filter(Resume.id == id).first()
+    if not resume:
+        return HTMLResponse("Resume not found.", status_code=404)
+
+    if not file.filename:
+        return HTMLResponse("No file selected.", status_code=400)
+
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if ext not in ("pdf", "docx"):
+        return HTMLResponse(
+            "Unsupported file format. Please upload a .pdf or .docx document.",
+            status_code=400,
+        )
+
+    content = await file.read()
+    if not content:
+        return HTMLResponse("Uploaded file is empty.", status_code=400)
+
+    upload_dir = get_upload_dir(request.app)
+    file_id = uuid.uuid4().hex
+    stored_original = f"{file_id}.{ext}"
+    file_path = upload_dir / stored_original
+    file_path.write_bytes(content)
+
+    if ext in ("docx", "doc"):
+        pdf_stored = f"{file_id}.pdf"
+        pdf_path = upload_dir / pdf_stored
+        converted = convert_docx_to_pdf(file_path, pdf_path)
+        if not converted or not pdf_path.exists():
+            pdf_path = file_path
+    else:
+        pdf_path = file_path
+
+    extracted_text = extract_text(file_path, ext)
+    next_version = max([v.version_number for v in resume.versions], default=0) + 1
+
+    version = ResumeVersion(
+        resume_id=resume.id,
+        version_number=next_version,
+        original_filename=file.filename,
+        file_path=str(file_path),
+        pdf_path=str(pdf_path),
+        file_size=len(content),
+        file_type=ext,
+        extracted_text=extracted_text,
+        change_notes=change_notes.strip() or f"Version {next_version}",
+    )
+    db.add(version)
+    resume.updated_at = datetime.datetime.now(datetime.UTC)
+    db.commit()
+
+    return RedirectResponse(url="/resumes", status_code=303)
+
+
+@app.post("/resumes/{id}/edit")
+async def edit_resume(
+    id: int,
+    title: str = Form(...),
+    description: str = Form(""),
+    tags: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Updates resume title, description, and tags."""
+    resume = db.query(Resume).filter(Resume.id == id).first()
+    if not resume:
+        return HTMLResponse("Resume not found.", status_code=404)
+
+    resume.title = title.strip()
+    resume.description = description.strip() or None
+    resume.tags = tags.strip()
+    resume.updated_at = datetime.datetime.now(datetime.UTC)
+    db.commit()
+
+    return RedirectResponse(url="/resumes", status_code=303)
+
+
+@app.get("/resumes/versions/{version_id}/view")
+async def view_resume_pdf(
+    version_id: int,
+    db: Session = Depends(get_db),
+):
+    """Streams the PDF version inline for in-browser viewing."""
+    version = db.query(ResumeVersion).filter(ResumeVersion.id == version_id).first()
+    if not version or not os.path.exists(version.pdf_path):
+        return HTMLResponse("PDF document not found.", status_code=404)
+
+    return FileResponse(
+        path=version.pdf_path,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{Path(version.pdf_path).name}"'},
+    )
+
+
+@app.get("/resumes/versions/{version_id}/download")
+async def download_resume(
+    version_id: int,
+    format: str = "pdf",
+    custom_filename: str = "",
+    db: Session = Depends(get_db),
+):
+    """Downloads resume with customizable, dated retrieval naming."""
+    version = db.query(ResumeVersion).filter(ResumeVersion.id == version_id).first()
+    if not version:
+        return HTMLResponse("Resume version not found.", status_code=404)
+
+    use_pdf = format.lower() == "pdf" or version.file_type == "pdf"
+    target_path = version.pdf_path if use_pdf else version.file_path
+    target_ext = "pdf" if use_pdf else version.file_type
+
+    if not os.path.exists(target_path):
+        return HTMLResponse("File not found on disk.", status_code=404)
+
+    pref = db.query(UserPreference).first()
+    pattern = pref.resume_filename_pattern if pref else "{name} {date}.{ext}"
+    date_format = pref.resume_date_format if pref else "%m-%d-%Y"
+    cand_name = pref.candidate_name if pref else ""
+
+    if custom_filename and custom_filename.strip():
+        download_name = custom_filename.strip()
+        if not download_name.lower().endswith(f".{target_ext}"):
+            download_name = f"{download_name}.{target_ext}"
+    else:
+        download_name = generate_download_filename(
+            pattern=pattern,
+            date_format=date_format,
+            candidate_name=cand_name,
+            resume_title=version.resume.title,
+            version_number=version.version_number,
+            file_ext=target_ext,
+        )
+
+    media_type = (
+        "application/pdf"
+        if use_pdf
+        else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+    return FileResponse(
+        path=target_path,
+        media_type=media_type,
+        filename=download_name,
+    )
+
+
+@app.get("/resumes/versions/{version_id}/preview", response_class=HTMLResponse)
+async def preview_resume_modal(
+    request: Request,
+    version_id: int,
+    db: Session = Depends(get_db),
+):
+    """HTMX partial returning the embedded PDF viewer and extracted text viewer tabs."""
+    version = db.query(ResumeVersion).filter(ResumeVersion.id == version_id).first()
+    if not version:
+        return HTMLResponse("Version not found.", status_code=404)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/resume_preview_modal.html",
+        context={
+            "version": version,
+            "resume": version.resume,
+        },
+    )
+
+
+@app.delete("/resumes/versions/{version_id}", response_class=HTMLResponse)
+async def delete_resume_version(
+    version_id: int,
+    db: Session = Depends(get_db),
+):
+    """Deletes a specific version and purges its physical files."""
+    version = db.query(ResumeVersion).filter(ResumeVersion.id == version_id).first()
+    if not version:
+        return HTMLResponse("Version not found.", status_code=404)
+
+    resume = version.resume
+    if version.file_path and os.path.exists(version.file_path):
+        try:
+            os.remove(version.file_path)
+        except OSError:
+            pass
+    if (
+        version.pdf_path
+        and version.pdf_path != version.file_path
+        and os.path.exists(version.pdf_path)
+    ):
+        try:
+            os.remove(version.pdf_path)
+        except OSError:
+            pass
+
+    db.delete(version)
+    resume.updated_at = datetime.datetime.now(datetime.UTC)
+    db.commit()
+
+    return HTMLResponse("", status_code=200)
+
+
+@app.delete("/resumes/{id}", response_class=HTMLResponse)
+async def delete_resume(
+    id: int,
+    db: Session = Depends(get_db),
+):
+    """Deletes an entire resume profile, all historical versions, and physical files."""
+    resume = db.query(Resume).filter(Resume.id == id).first()
+    if not resume:
+        return HTMLResponse("Resume not found.", status_code=404)
+
+    for version in resume.versions:
+        if version.file_path and os.path.exists(version.file_path):
+            try:
+                os.remove(version.file_path)
+            except OSError:
+                pass
+        if (
+            version.pdf_path
+            and version.pdf_path != version.file_path
+            and os.path.exists(version.pdf_path)
+        ):
+            try:
+                os.remove(version.pdf_path)
+            except OSError:
+                pass
+
+    db.delete(resume)
+    db.commit()
+    return HTMLResponse("", status_code=200)
+
+
+@app.post("/resumes/settings")
+async def update_resume_settings(
+    candidate_name: str = Form(""),
+    resume_filename_pattern: str = Form("{name} {date}.{ext}"),
+    resume_date_format: str = Form("%m-%d-%Y"),
+    db: Session = Depends(get_db),
+):
+    """Updates candidate export naming preferences."""
+    pref = db.query(UserPreference).first()
+    if not pref:
+        pref = UserPreference()
+        db.add(pref)
+
+    pref.candidate_name = candidate_name.strip()
+    pref.resume_filename_pattern = resume_filename_pattern.strip() or "{name} {date}.{ext}"
+    pref.resume_date_format = resume_date_format.strip() or "%m-%d-%Y"
+    db.commit()
+
+    return RedirectResponse(url="/resumes", status_code=303)

@@ -43,3 +43,11 @@ Guidelines and constraints for all backend code in PyJobs.
 * Scrapers must cleanly handle network failures, timeouts, and schema variations in third-party job boards.
 * Use rate-limiting, polite delays, and realistic headers.
 * **Testing Constraint**: Automated tests must NEVER make real network requests to external job boards. Always mock `fetch_jobs` or network clients in unit tests.
+
+---
+
+## 5. File Storage & Upload Safety
+* Local uploads are stored in `uploads/resumes/` within the project root and MUST remain gitignored for privacy and security.
+* Automated tests must NEVER write to or depend upon files in the project root `uploads/` directory. All file-based tests must use `tempfile.TemporaryDirectory()`.
+* When versions or resumes are deleted, remove physical files using `pathlib.Path.unlink(missing_ok=True)`.
+
