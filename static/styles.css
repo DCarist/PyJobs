@@ -11,6 +11,12 @@
   --danger: #ef4444;
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
   font-family: "Inter", system-ui, sans-serif;
   background-color: var(--bg-color);
@@ -128,6 +134,7 @@ input:focus {
     box-shadow 0.2s;
   width: 100%;
   font-size: 1rem;
+  box-sizing: border-box;
 }
 
 .btn-primary:hover {
@@ -145,10 +152,21 @@ input:focus {
   cursor: pointer;
   transition: all 0.2s;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .btn-secondary:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+a.btn-primary,
+a.btn-primary:visited,
+a.btn-primary:hover,
+a.btn-secondary,
+a.btn-secondary:visited,
+a.btn-secondary:hover {
+  color: #ffffff;
+  text-decoration: none;
 }
 
 .checkbox-group {
@@ -2014,6 +2032,43 @@ dialog.modal-dialog::backdrop {
   color: var(--text-secondary);
 }
 
+.resume-person-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.725rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  color: #c4b5fd;
+  white-space: nowrap;
+}
+
+.version-meta-file-row {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.version-meta-filename {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+
+.version-meta-filesize {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .version-notes-callout {
   margin-top: 0.5rem;
   font-size: 0.775rem;
@@ -2027,9 +2082,15 @@ dialog.modal-dialog::backdrop {
   grid-template-columns: repeat(2, 1fr);
   gap: 0.5rem;
   margin-top: 0.5rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .btn-action {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  height: 38px;
   padding: 0.45rem 0.65rem;
   font-size: 0.8rem;
   font-weight: 600;
@@ -2038,6 +2099,9 @@ dialog.modal-dialog::backdrop {
   justify-content: center;
   text-decoration: none;
   border-radius: 8px;
+  line-height: 1;
+  gap: 0.35rem;
+  white-space: nowrap;
 }
 
 .version-history-details {

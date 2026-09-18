@@ -148,12 +148,13 @@ set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
 
 ## Resume Management & Versioning (`/resumes`)
 
-* **Targeted Resume Profiles**: Organize multiple targeted resumes by role or industry (e.g., "Full Stack Engineer", "Senior Backend Developer") with customizable tags.
+* **Targeted Resume Profiles & Person Tracking**: Organize resumes by role and candidate (e.g., "Douglas - MSAT Focused", "Marissa - General Resume") with dedicated Person associations and customizable tags.
+* **Candidate Filtering**: Filter resume cards instantly by referenced Person via dedicated top-level filter pills, integrated with keyword search and tag filters.
 * **Chronological Versioning**: Track document revisions over time (v1, v2, v3...) with explicit change notes and file metadata.
 * **High-Fidelity Document Processing**: Strict validation and parsing for industry-standard **PDF** and **Word (.docx)** files using **PyMuPDF** and **python-docx**.
 * **Automatic PDF Compilation**: Uploaded Word `.docx` documents are automatically compiled to `.pdf` upon upload, ensuring **100% of resume versions have a PDF available**.
 * **In-Browser PDF Reader**: Review resumes directly within the application in a native embedded PDF viewer with full zoom, search, scroll, and print controls, alongside an ATS-extracted plain-text inspector.
-* **Custom Retrieval Naming & Dating**: Download resumes with dynamic, template-driven naming patterns (e.g. `{name} {date}.{ext}` &rarr; `Marissa G 09-10-2026.pdf` or `.docx`), with instant 1-click retrieval or on-the-fly custom filename adjustments.
+* **Custom Retrieval Naming & Dating**: Download resumes with dynamic, template-driven naming patterns (e.g. `{name} {date}.{ext}` &rarr; `Douglas Jaymes Caristo 09-18-2026.docx`), automatically resolving `{name}` to each resume's assigned Person with fallback to global preferences.
 * **Application Tracker Integration**: Select and link specific resume versions to each tracked job application, inspect submitted versions on the application detail command center, and receive keyword-matching resume recommendations.
 * **Private, Hermetic Storage**: Uploaded files are safely stored in `uploads/resumes/`, strictly excluded from git tracking (`.gitignore`) to ensure privacy.
 

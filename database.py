@@ -186,6 +186,12 @@ def init_db() -> None:
                     text("ALTER TABLE resume_versions ADD COLUMN pdf_path VARCHAR DEFAULT ''")
                 )
 
+        # 8. Resumes person column migration
+        if "resumes" in tables:
+            resume_columns = [c["name"] for c in inspector.get_columns("resumes")]
+            if "person" not in resume_columns:
+                conn.execute(text("ALTER TABLE resumes ADD COLUMN person VARCHAR DEFAULT ''"))
+
         conn.commit()
 
     # Backfill and synchronize existing job classifications and salary data

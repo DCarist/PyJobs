@@ -232,6 +232,7 @@ class Resume(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     title: Mapped[str] = mapped_column(String, index=True)
+    person: Mapped[str] = mapped_column(String, default="", index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
     tags: Mapped[str] = mapped_column(String, default="")  # comma separated e.g. 'Python, FastAPI'
     created_at: Mapped[datetime.datetime] = mapped_column(

@@ -76,9 +76,12 @@
         >
         {% if active_tag and active_tag != 'all' %}
         <input type="hidden" name="tag" value="{{ active_tag }}">
+        {% endif %} {% if active_person and active_person != 'all' %}
+        <input type="hidden" name="person" value="{{ active_person }}">
         {% endif %}
         <button type="submit" class="btn-primary" style="padding: 0.5rem 1rem;">Search</button>
-        {% if q or (active_tag and active_tag != 'all') %}
+        {% if q or (active_tag and active_tag != 'all') or (active_person and active_person !=
+        'all') %}
         <a
           href="/resumes"
           class="btn-secondary"
@@ -99,25 +102,52 @@
     </form>
   </div>
 
+  <!-- Person Filter Bar -->
+  {% if people %}
+  <div
+    class="person-pill-container"
+    style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; align-items: center;"
+  >
+    <span
+      style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-right: 0.25rem;"
+      >Filter by Person:</span
+    >
+    <a
+      href="/resumes?person=all{% if active_tag and active_tag != 'all' %}&tag={{ active_tag }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+      class="resume-tag-pill {% if active_person == 'all' or not active_person %}active{% endif %}"
+    >
+      All Resumes ({{ all_resumes_count }})
+    </a>
+    {% for p in people %}
+    <a
+      href="/resumes?person={{ p }}{% if active_tag and active_tag != 'all' %}&tag={{ active_tag }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+      class="resume-tag-pill {% if active_person == p %}active{% endif %}"
+    >
+      👤 {{ p }}
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <!-- Tag Pill Filter Bar -->
   {% if tags %}
   <div
     class="tag-pill-container"
-    style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; align-items: center;"
+    style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; align-items: center;"
   >
     <span
       style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-right: 0.25rem;"
       >Filter by Tag:</span
     >
     <a
-      href="/resumes{% if q %}?q={{ q }}{% endif %}"
+      href="/resumes?tag=all{% if active_person and active_person != 'all' %}&person={{ active_person }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
       class="resume-tag-pill {% if active_tag == 'all' or not active_tag %}active{% endif %}"
     >
-      All Resumes
+      All Tags
     </a>
     {% for t in tags %}
     <a
-      href="/resumes?tag={{ t }}{% if q %}&q={{ q }}{% endif %}"
+      href="/resumes?tag={{ t }}{% if active_person and active_person != 'all' %}&person={{ active_person }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
       class="resume-tag-pill {% if active_tag == t %}active{% endif %}"
     >
       {{ t }}
@@ -133,10 +163,10 @@
       <div style="font-size: 3rem; margin-bottom: 1rem;">📄</div>
       <h3 style="margin: 0 0 0.5rem 0; font-size: 1.35rem;">No Resumes Found</h3>
       <p style="color: var(--text-secondary); max-width: 500px; margin: 0 auto 1.5rem auto;">
-        {% if q or (active_tag and active_tag != 'all') %} No resumes matched your search query or
-        tag filter. Try resetting your search. {% else %} Upload your first resume in PDF or Word
-        (.docx) format to enable version tracking, in-browser PDF viewing, and automated ATS keyword
-        analysis. {% endif %}
+        {% if q or (active_tag and active_tag != 'all') or (active_person and active_person !=
+        'all') %} No resumes matched your search query or filters. Try resetting your search. {%
+        else %} Upload your first resume in PDF or Word (.docx) format to enable version tracking,
+        in-browser PDF viewing, and automated ATS keyword analysis. {% endif %}
       </p>
       <button
         type="button"
@@ -156,12 +186,30 @@
         <!-- Resume Card Header -->
         <div class="resume-card-header">
           <div>
-            <h3 class="resume-card-title">{{ resume.title }}</h3>
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+              <h3 class="resume-card-title" style="margin: 0;">{{ resume.title }}</h3>
+              {% if resume.person %}
+              <span class="resume-person-badge">👤 {{ resume.person }}</span>
+              {% endif %}
+            </div>
             {% if resume.description %}
-            <p class="resume-card-description">{{ resume.description }}</p>
+            <p class="resume-card-description" style="margin-top: 0.25rem;">
+              {{ resume.description }}
+            </p>
             {% endif %}
           </div>
-          <div class="resume-card-actions">
+          <div
+            class="resume-card-actions"
+            style="display: flex; gap: 0.35rem; align-items: center;"
+          >
+            <button
+              type="button"
+              class="btn-icon-secondary"
+              onclick="openEditResumeModal('{{ resume.id }}', '{{ resume.title|escape }}', '{{ (resume.person or '')|escape }}', '{{ (resume.tags or '')|escape }}', '{{ (resume.description or '')|escape }}')"
+              title="Edit resume profile and person"
+            >
+              ✏️
+            </button>
             <button
               type="button"
               class="btn-icon-danger"
@@ -203,11 +251,13 @@
             <span class="version-date">{{ latest.created_at.strftime('%b %d, %Y') }}</span>
           </div>
 
-          <div
-            style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary); display: flex; justify-content: space-between;"
-          >
-            <span title="Original file name">{{ latest.original_filename }}</span>
-            <span>{{ (latest.file_size / 1024)|round(1) }} KB</span>
+          <div class="version-meta-file-row">
+            <span
+              class="version-meta-filename"
+              title="Original file name: {{ latest.original_filename }}"
+              >{{ latest.original_filename }}</span
+            >
+            <span class="version-meta-filesize">{{ (latest.file_size / 1024)|round(1) }} KB</span>
           </div>
 
           {% if latest.change_notes %}
@@ -230,18 +280,19 @@
             <span>👁 View PDF</span>
           </button>
 
-          <a
-            href="/resumes/versions/{{ latest.id }}/download?format=pdf"
+          <button
+            type="button"
             class="btn-secondary btn-action"
-            title="1-Click Download using default retrieval name"
+            onclick="window.location.href='/resumes/versions/{{ latest.id }}/download?format=original'"
+            title="1-Click Download using customized retrieval name"
           >
             <span>⬇ Download</span>
-          </a>
+          </button>
 
           <button
             type="button"
             class="btn-secondary btn-action"
-            onclick="openCustomDownloadModal('{{ latest.id }}', '{{ resume.title }}', '{{ latest.version_number }}', '{{ latest.file_type }}')"
+            onclick="openCustomDownloadModal('{{ latest.id }}', '{{ resume.title|escape }}', '{{ latest.version_number }}', '{{ latest.file_type }}', '{{ (resume.person or '')|escape }}')"
             title="Customize retrieval filename or choose format"
           >
             <span>⚙ Custom...</span>
@@ -339,6 +390,26 @@
     <form method="post" action="/resumes" enctype="multipart/form-data">
       <div class="form-group" style="margin-bottom: 1rem;">
         <label
+          for="new-resume-person"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          Person / Candidate Name
+        </label>
+        <input
+          type="text"
+          id="new-resume-person"
+          name="person"
+          placeholder="e.g. Douglas Jaymes Caristo, Marissa Gaeta"
+          style="width: 100%; box-sizing: border-box;"
+        >
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          Substitutes the <code style="color: var(--accent-light);">{name}</code> token in
+          downloaded filenames and enables filtering by candidate.
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label
           for="new-resume-title"
           style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
         >
@@ -434,6 +505,106 @@
           Cancel
         </button>
         <button type="submit" class="btn-primary">Upload & Create Profile</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ======================================================================== -->
+  <!-- Dialog 1B: Edit Resume Profile Modal                                     -->
+  <!-- ======================================================================== -->
+  <dialog id="edit-resume-dialog" class="modal-dialog">
+    <div
+      style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;"
+    >
+      <h3 style="margin: 0; font-size: 1.35rem;">Edit Resume Profile</h3>
+      <button
+        type="button"
+        class="modal-close-btn"
+        onclick="document.getElementById('edit-resume-dialog').close()"
+      >
+        &times;
+      </button>
+    </div>
+
+    <form id="edit-resume-form" method="post" action="">
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label
+          for="edit-resume-person"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          Person / Candidate Name
+        </label>
+        <input
+          type="text"
+          id="edit-resume-person"
+          name="person"
+          placeholder="e.g. Douglas Jaymes Caristo, Marissa Gaeta"
+          style="width: 100%; box-sizing: border-box;"
+        >
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          Substitutes the <code style="color: var(--accent-light);">{name}</code> token in
+          downloaded filenames and enables filtering by candidate.
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label
+          for="edit-resume-title"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          Resume Profile Title <span style="color: #ef4444;">*</span>
+        </label>
+        <input
+          type="text"
+          id="edit-resume-title"
+          name="title"
+          required
+          style="width: 100%; box-sizing: border-box;"
+        >
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label
+          for="edit-resume-tags"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          Tags / Role Keywords
+        </label>
+        <input
+          type="text"
+          id="edit-resume-tags"
+          name="tags"
+          style="width: 100%; box-sizing: border-box;"
+        >
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          Comma-separated keywords for filtering and smart job matching.
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1.5rem;">
+        <label
+          for="edit-resume-desc"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          Description / Target Focus
+        </label>
+        <textarea
+          id="edit-resume-desc"
+          name="description"
+          rows="2"
+          style="width: 100%; box-sizing: border-box;"
+        ></textarea>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+        <button
+          type="button"
+          class="btn-secondary"
+          onclick="document.getElementById('edit-resume-dialog').close()"
+        >
+          Cancel
+        </button>
+        <button type="submit" class="btn-primary">Save Changes</button>
       </div>
     </form>
   </dialog>
@@ -606,7 +777,7 @@
           for="pref-cand-name"
           style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
         >
-          Your Full Name / Professional Name
+          Default Candidate / Person Name (Fallback)
         </label>
         <input
           type="text"
@@ -618,7 +789,7 @@
         >
         <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
           Substitutes the <code style="color: var(--accent-light);">{name}</code> token in
-          downloaded file names.
+          downloaded file names when a resume does not have a Person set.
         </div>
       </div>
 
@@ -688,6 +859,7 @@ let activeVersionId = null;
 let activeResumeTitle = "";
 let activeVersionNum = 1;
 let activeFileType = "pdf";
+let activePerson = "";
 
 window.openUploadVersionModal = (resumeId, title, nextVersion) => {
   document.getElementById("upload-version-form").action = `/resumes/${resumeId}/versions`;
@@ -696,11 +868,21 @@ window.openUploadVersionModal = (resumeId, title, nextVersion) => {
   document.getElementById("upload-version-dialog").showModal();
 };
 
-window.openCustomDownloadModal = (versionId, resumeTitle, versionNum, fileType) => {
+window.openEditResumeModal = (resumeId, title, person, tags, desc) => {
+  document.getElementById("edit-resume-form").action = `/resumes/${resumeId}/edit`;
+  document.getElementById("edit-resume-person").value = person;
+  document.getElementById("edit-resume-title").value = title;
+  document.getElementById("edit-resume-tags").value = tags;
+  document.getElementById("edit-resume-desc").value = desc;
+  document.getElementById("edit-resume-dialog").showModal();
+};
+
+window.openCustomDownloadModal = (versionId, resumeTitle, versionNum, fileType, person) => {
   activeVersionId = versionId;
   activeResumeTitle = resumeTitle;
   activeVersionNum = versionNum;
   activeFileType = fileType.toLowerCase();
+  activePerson = person || "";
 
   const origOption = document.getElementById("custom-download-original-option");
   if (activeFileType === "docx") {
@@ -718,7 +900,8 @@ window.openCustomDownloadModal = (versionId, resumeTitle, versionNum, fileType) 
 window.updateDownloadFilenamePreview = () => {
   const format = document.getElementById("custom-download-format").value;
   const ext = format === "pdf" ? "pdf" : activeFileType;
-  const candName = "{{ pref.candidate_name if pref and pref.candidate_name else '' }}";
+  const candName =
+    activePerson || "{{ pref.candidate_name if pref and pref.candidate_name else '' }}";
   const pattern =
     "{{ pref.resume_filename_pattern if pref and pref.resume_filename_pattern else '{name} {date}.{ext}' }}";
   const todayStr =

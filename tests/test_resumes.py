@@ -362,3 +362,125 @@ def test_resume_parser_pure_functions():
         job_description="Patient care in hospital environment.",
     )
     assert score_low < 0.1
+
+
+def test_create_and_edit_resume_person(client, db_session: Session):
+    pdf = make_dummy_pdf("Candidate profile")
+    resp = client.post(
+        "/resumes",
+        data={
+            "title": "Douglas - MSAT Focused",
+            "person": "Douglas Jaymes Caristo",
+            "tags": "MSAT Engineer, CAPA",
+            "description": "Biotech MSAT specialist",
+        },
+        files={"file": ("douglas.pdf", pdf, "application/pdf")},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+
+    resume = db_session.query(Resume).filter(Resume.title == "Douglas - MSAT Focused").first()
+    assert resume is not None
+    assert resume.person == "Douglas Jaymes Caristo"
+
+    # Verify displayed on /resumes
+    list_resp = client.get("/resumes")
+    assert list_resp.status_code == 200
+    assert "Douglas Jaymes Caristo" in list_resp.text
+    assert "Filter by Person:" in list_resp.text
+
+    # Edit person
+    edit_resp = client.post(
+        f"/resumes/{resume.id}/edit",
+        data={
+            "title": "Douglas - Senior MSAT",
+            "person": "Douglas J. Caristo",
+            "tags": "MSAT, Validation",
+            "description": "Updated focus",
+        },
+        follow_redirects=False,
+    )
+    assert edit_resp.status_code == 303
+    db_session.refresh(resume)
+    assert resume.title == "Douglas - Senior MSAT"
+    assert resume.person == "Douglas J. Caristo"
+    assert resume.tags == "MSAT, Validation"
+
+
+def test_filter_resumes_by_person(client, db_session: Session):
+    pdf = make_dummy_pdf("Content")
+    client.post(
+        "/resumes",
+        data={"title": "Douglas Profile", "person": "Douglas Caristo"},
+        files={"file": ("doug.pdf", pdf, "application/pdf")},
+    )
+    client.post(
+        "/resumes",
+        data={"title": "Marissa Profile", "person": "Marissa Gaeta"},
+        files={"file": ("marissa.pdf", pdf, "application/pdf")},
+    )
+
+    # Filter for Douglas
+    resp_doug = client.get("/resumes?person=Douglas%20Caristo")
+    assert resp_doug.status_code == 200
+    assert "Douglas Profile" in resp_doug.text
+    assert "Marissa Profile" not in resp_doug.text
+
+    # Filter for Marissa
+    resp_marissa = client.get("/resumes?person=Marissa%20Gaeta")
+    assert resp_marissa.status_code == 200
+    assert "Marissa Profile" in resp_marissa.text
+    assert "Douglas Profile" not in resp_marissa.text
+
+    # Filter all
+    resp_all = client.get("/resumes?person=all")
+    assert resp_all.status_code == 200
+    assert "Douglas Profile" in resp_all.text
+    assert "Marissa Profile" in resp_all.text
+
+
+def test_download_filename_maps_name_to_person_with_fallback(client, db_session: Session):
+    import urllib.parse
+
+    pref = db_session.query(UserPreference).first()
+    if not pref:
+        pref = UserPreference()
+        db_session.add(pref)
+    pref.candidate_name = "Global Fallback"
+    pref.resume_filename_pattern = "{name} {date}.{ext}"
+    pref.resume_date_format = "%m-%d-%Y"
+    db_session.commit()
+
+    pdf = make_dummy_pdf("Resume file")
+    # 1. Resume WITH person specified
+    client.post(
+        "/resumes",
+        data={"title": "MSAT Resume", "person": "Douglas Jaymes Caristo"},
+        files={"file": ("doc.pdf", pdf, "application/pdf")},
+    )
+    res_with_person = (
+        db_session.query(Resume).filter(Resume.person == "Douglas Jaymes Caristo").first()
+    )
+    assert res_with_person is not None
+    v_person = res_with_person.versions[0]
+
+    resp_download_person = client.get(f"/resumes/versions/{v_person.id}/download")
+    assert resp_download_person.status_code == 200
+    disp_person = urllib.parse.unquote(resp_download_person.headers["content-disposition"])
+    assert "Douglas Jaymes Caristo" in disp_person
+    assert "Global Fallback" not in disp_person
+
+    # 2. Resume WITHOUT person specified -> falls back to global candidate_name
+    client.post(
+        "/resumes",
+        data={"title": "Anonymous Resume", "person": ""},
+        files={"file": ("anon.pdf", pdf, "application/pdf")},
+    )
+    res_anon = db_session.query(Resume).filter(Resume.title == "Anonymous Resume").first()
+    assert res_anon is not None
+    v_anon = res_anon.versions[0]
+
+    resp_download_anon = client.get(f"/resumes/versions/{v_anon.id}/download")
+    assert resp_download_anon.status_code == 200
+    disp_anon = urllib.parse.unquote(resp_download_anon.headers["content-disposition"])
+    assert "Global Fallback" in disp_anon

@@ -15,7 +15,7 @@ from fastapi import Depends, FastAPI, File, Form, Request, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -1630,34 +1630,42 @@ async def add_application_activity(
 async def list_resumes(
     request: Request,
     tag: str = "all",
+    person: str = "all",
     q: str = "",
     db: Session = Depends(get_db),
 ):
-    """Resume Management Dashboard with tag filtering and version history."""
+    """Resume Management Dashboard with tag/person filtering and version history."""
     query = db.query(Resume)
     if tag and tag != "all":
         query = query.filter(Resume.tags.ilike(f"%{tag}%"))
+    if person and person != "all":
+        query = query.filter(func.lower(Resume.person) == person.strip().lower())
     if q and q.strip():
         term = f"%{q.strip()}%"
         query = query.filter(
             or_(
                 Resume.title.ilike(term),
+                Resume.person.ilike(term),
                 Resume.description.ilike(term),
                 Resume.tags.ilike(term),
             )
         )
     resumes = query.order_by(Resume.updated_at.desc(), Resume.id.desc()).all()
 
-    # Collect distinct tags
+    # Collect distinct tags and distinct people
     all_resumes = db.query(Resume).all()
     unique_tags: set[str] = set()
+    unique_people: set[str] = set()
     for r in all_resumes:
         if r.tags:
             for t in r.tags.split(","):
                 clean = t.strip()
                 if clean:
                     unique_tags.add(clean)
+        if r.person and r.person.strip():
+            unique_people.add(r.person.strip())
     sorted_tags = sorted(unique_tags, key=str.lower)
+    sorted_people = sorted(unique_people, key=str.lower)
 
     pref = db.query(UserPreference).first()
 
@@ -1666,10 +1674,13 @@ async def list_resumes(
         name="resumes.html",
         context={
             "resumes": resumes,
+            "all_resumes_count": len(all_resumes),
             "active_page": "resumes",
             "active_tag": tag,
+            "active_person": person,
             "q": q,
             "tags": sorted_tags,
+            "people": sorted_people,
             "pref": pref,
             "today": datetime.date.today(),
         },
@@ -1680,6 +1691,7 @@ async def list_resumes(
 async def create_resume(
     request: Request,
     title: str = Form(...),
+    person: str = Form(""),
     description: str = Form(""),
     tags: str = Form(""),
     change_notes: str = Form("Initial upload"),
@@ -1721,6 +1733,7 @@ async def create_resume(
 
     resume = Resume(
         title=title.strip(),
+        person=person.strip(),
         description=description.strip() or None,
         tags=tags.strip(),
     )
@@ -1811,16 +1824,18 @@ async def upload_resume_version(
 async def edit_resume(
     id: int,
     title: str = Form(...),
+    person: str = Form(""),
     description: str = Form(""),
     tags: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    """Updates resume title, description, and tags."""
+    """Updates resume title, person, description, and tags."""
     resume = db.query(Resume).filter(Resume.id == id).first()
     if not resume:
         return HTMLResponse("Resume not found.", status_code=404)
 
     resume.title = title.strip()
+    resume.person = person.strip()
     resume.description = description.strip() or None
     resume.tags = tags.strip()
     resume.updated_at = datetime.datetime.now(datetime.UTC)
@@ -1849,7 +1864,7 @@ async def view_resume_pdf(
 @app.get("/resumes/versions/{version_id}/download")
 async def download_resume(
     version_id: int,
-    format: str = "pdf",
+    format: str = "original",
     custom_filename: str = "",
     db: Session = Depends(get_db),
 ):
@@ -1858,7 +1873,9 @@ async def download_resume(
     if not version:
         return HTMLResponse("Resume version not found.", status_code=404)
 
-    use_pdf = format.lower() == "pdf" or version.file_type == "pdf"
+    use_pdf = format.lower() == "pdf" or (
+        format.lower() != "original" and version.file_type == "pdf"
+    )
     target_path = version.pdf_path if use_pdf else version.file_path
     target_ext = "pdf" if use_pdf else version.file_type
 
@@ -1868,7 +1885,13 @@ async def download_resume(
     pref = db.query(UserPreference).first()
     pattern = pref.resume_filename_pattern if pref else "{name} {date}.{ext}"
     date_format = pref.resume_date_format if pref else "%m-%d-%Y"
-    cand_name = pref.candidate_name if pref else ""
+    # Resolve candidate name: resume.person takes precedence, then pref.candidate_name,
+    # then fallback to resume.title
+    cand_name = (
+        (version.resume.person or "").strip()
+        or (pref.candidate_name if pref else "").strip()
+        or version.resume.title
+    )
 
     if custom_filename and custom_filename.strip():
         download_name = custom_filename.strip()
