@@ -122,7 +122,7 @@ set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
 ## Application Tracking & Unemployment Compliance
 
 ### Application Pipeline (`/applications`)
-* **1-Click Feed Tracking**: Track jobs directly from the curated feed with automatic follow-up dates (+14 days) and audit logging.
+* **1-Click Feed Tracking & Saving**: Track jobs as applied (`📌 Track Application`) or save them to apply later (`💾 Save Job`) directly from the search feed with automatic audit logging.
 * **Interactive Kanban Board**: Visual drag-and-drop workflow across 6 pipeline stages:
   * `📌 Saved / To Apply`
   * `✉️ Applied`
@@ -139,7 +139,7 @@ set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
 * **External Application Modal**: Log jobs applied to outside the feed (e.g. company careers portals, job fairs, direct emails).
 
 ### Unemployment Work-Search Audit Log (`/applications/unemployment-report`)
-* **Weekly Claim Certification**: Automatically aggregates all application submissions, phone screens, interviews, and contacts into Saturday week-ending periods.
+* **Weekly Claim Certification**: Automatically aggregates certified work-search applications, phone screens, interviews, and contacts into Saturday week-ending periods, while strictly excluding uncertified saved and cancelled job events.
 * **Compliance Standards**: Highlights whether each claim period meets the standard 3+ work-search activities requirement with visual badges.
 * **Audit Documentation**: Captures applicant portal creation, portal usernames, and confirmation numbers as official proof for state unemployment audits.
 * **Export & Print**: Dedicated print-to-PDF stylesheet and instant CSV export for submitting weekly claims.

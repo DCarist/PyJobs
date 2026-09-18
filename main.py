@@ -11,7 +11,7 @@ from typing import Any, TypedDict
 
 import markdown
 import pandas as pd
-from fastapi import Depends, FastAPI, File, Form, Request, Response, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -887,11 +887,20 @@ async def unhide_job(id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/job/{id}/track", response_class=HTMLResponse)
-async def track_job(request: Request, id: int, db: Session = Depends(get_db)):
-    """1-Click tracking from curated feed with smart defaults."""
+async def track_job(
+    request: Request,
+    id: int,
+    status: str = Query("applied"),
+    db: Session = Depends(get_db),
+):
+    """1-Click tracking from curated feed with smart defaults (applied or saved)."""
     job = db.query(SavedJob).filter(SavedJob.id == id).first()
     if not job:
         return HTMLResponse("Job not found.", status_code=404)
+
+    target_status = status.lower().strip() if status else "applied"
+    if target_status not in ["saved", "applied"]:
+        target_status = "applied"
 
     app_record = db.query(JobApplication).filter(JobApplication.saved_job_id == job.id).first()
     if not app_record:
@@ -906,6 +915,8 @@ async def track_job(request: Request, id: int, db: Session = Depends(get_db)):
         if matched and matched[0][1] >= 0.2 and matched[0][0].versions:
             suggested_rv_id = matched[0][0].versions[0].id
 
+        applied_dt = today if target_status == "applied" else None
+
         app_record = JobApplication(
             saved_job_id=job.id,
             title=job.title,
@@ -914,26 +925,49 @@ async def track_job(request: Request, id: int, db: Session = Depends(get_db)):
             salary_stated=salary,
             job_url=job.job_url,
             description=job.description,
-            status="applied",
-            applied_date=today,
+            status=target_status,
+            applied_date=applied_dt,
             method=method,
-            follow_up_date=follow_up,
+            follow_up_date=follow_up if target_status == "applied" else None,
             resume_version_id=suggested_rv_id,
         )
         db.add(app_record)
         db.flush()
 
+        act_note = (
+            f"Tracked application from feed ({method})"
+            if target_status == "applied"
+            else f"Saved job from feed ({method})"
+        )
         activity = ApplicationActivity(
             application_id=app_record.id,
             activity_type="status_change",
             old_status=None,
-            new_status="applied",
-            note=f"Tracked application from feed ({method})",
+            new_status=target_status,
+            note=act_note,
             activity_date=today,
         )
         db.add(activity)
         db.commit()
         db.refresh(app_record)
+    else:
+        # If already tracked as 'saved' and user clicks 'Track Application', upgrade to 'applied'
+        if app_record.status == "saved" and target_status == "applied":
+            today = datetime.date.today()
+            app_record.status = "applied"
+            app_record.applied_date = today
+            app_record.follow_up_date = today + datetime.timedelta(days=14)
+            activity = ApplicationActivity(
+                application_id=app_record.id,
+                activity_type="status_change",
+                old_status="saved",
+                new_status="applied",
+                note="Marked as applied from feed",
+                activity_date=today,
+            )
+            db.add(activity)
+            db.commit()
+            db.refresh(app_record)
 
     tracked_map = {job.id: app_record}
     return templates.TemplateResponse(
@@ -1197,6 +1231,8 @@ async def unemployment_report(request: Request, db: Session = Depends(get_db)):
     seen_keys = set()
 
     for a in apps:
+        if a.status and a.status.lower() in ("saved", "cancelled", "canceled"):
+            continue
         if a.applied_date:
             key = (a.id, a.applied_date, "Submitted Application")
             seen_keys.add(key)
@@ -1219,6 +1255,13 @@ async def unemployment_report(request: Request, db: Session = Depends(get_db)):
         app_obj = act.application
         if not app_obj:
             continue
+        if app_obj.status and app_obj.status.lower() in ("saved", "cancelled", "canceled"):
+            continue
+        if act.new_status and act.new_status.lower() in ("saved", "cancelled", "canceled"):
+            continue
+        if act.activity_type and act.activity_type.lower() in ("saved", "cancelled", "canceled"):
+            continue
+
         type_label = "Logged Activity"
         if act.activity_type == "interview":
             type_label = "Attended Interview / Screen"
@@ -1292,8 +1335,14 @@ async def export_unemployment_report(db: Session = Depends(get_db)):
     )
 
     rows = []
+    seen_keys = set()
+
     for a in apps:
+        if a.status and a.status.lower() in ("saved", "cancelled", "canceled"):
+            continue
         if a.applied_date:
+            key = (a.id, a.applied_date, "Submitted Application")
+            seen_keys.add(key)
             we = get_week_ending(a.applied_date)
             rows.append(
                 {
@@ -1315,27 +1364,49 @@ async def export_unemployment_report(db: Session = Depends(get_db)):
         app_obj = act.application
         if (
             not app_obj
-            or act.activity_type == "status_change"
-            and act.new_status not in ["screening", "interviewing", "offer"]
+            or (app_obj.status and app_obj.status.lower() in ("saved", "cancelled", "canceled"))
+            or (act.new_status and act.new_status.lower() in ("saved", "cancelled", "canceled"))
+            or (
+                act.activity_type
+                and act.activity_type.lower() in ("saved", "cancelled", "canceled")
+            )
         ):
             continue
-        we = get_week_ending(act.activity_date)
-        type_label = act.activity_type.replace("_", " ").title()
-        rows.append(
-            {
-                "Claim Week Ending": we.strftime("%Y-%m-%d"),
-                "Activity Date": act.activity_date.strftime("%Y-%m-%d"),
-                "Activity Type": type_label,
-                "Employer": app_obj.company,
-                "Job Title": app_obj.title,
-                "Contact Method": app_obj.method,
-                "Portal Account": "Yes" if app_obj.account_created else "No",
-                "Portal Username": app_obj.portal_username or "",
-                "Confirmation #": app_obj.confirmation_number or "",
-                "Current Status": app_obj.status.capitalize(),
-                "Notes": act.note or "",
-            }
-        )
+
+        type_label = "Logged Activity"
+        if act.activity_type == "interview":
+            type_label = "Attended Interview / Screen"
+        elif act.activity_type == "contact":
+            type_label = "Employer / Recruiter Contact"
+        elif act.activity_type == "follow_up":
+            type_label = "Follow-up Sent"
+        elif act.activity_type == "status_change":
+            if act.new_status in ["screening", "interviewing"]:
+                type_label = f"Advanced to {act.new_status.capitalize()}"
+            elif act.new_status == "offer":
+                type_label = "Offer Extended"
+            else:
+                continue
+
+        key = (app_obj.id, act.activity_date, type_label)
+        if key not in seen_keys:
+            seen_keys.add(key)
+            we = get_week_ending(act.activity_date)
+            rows.append(
+                {
+                    "Claim Week Ending": we.strftime("%Y-%m-%d"),
+                    "Activity Date": act.activity_date.strftime("%Y-%m-%d"),
+                    "Activity Type": type_label,
+                    "Employer": app_obj.company,
+                    "Job Title": app_obj.title,
+                    "Contact Method": app_obj.method,
+                    "Portal Account": "Yes" if app_obj.account_created else "No",
+                    "Portal Username": app_obj.portal_username or "",
+                    "Confirmation #": app_obj.confirmation_number or "",
+                    "Current Status": app_obj.status.capitalize(),
+                    "Notes": act.note or "",
+                }
+            )
 
     df = pd.DataFrame(rows)
     return Response(

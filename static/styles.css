@@ -545,6 +545,22 @@ a.btn-secondary:hover {
   transform: translateY(-1px);
 }
 
+/* Prominent Action 2b: Save Job */
+.actions-bar .btn-save-job {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
+}
+
+.actions-bar .btn-save-job:hover {
+  background: rgba(245, 158, 11, 0.3);
+  color: #ffffff;
+  border-color: #fbbf24;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4);
+  transform: translateY(-1px);
+}
+
 .actions-bar .btn-track-active {
   background: rgba(99, 102, 241, 0.2);
   color: #a5b4fc;

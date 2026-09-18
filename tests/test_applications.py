@@ -45,6 +45,49 @@ def test_track_job_from_feed(client: TestClient, db_session: Session):
     assert app_record.activities[0].new_status == "applied"
 
 
+def test_track_job_as_saved_from_feed(client: TestClient, db_session: Session):
+    job = SavedJob(
+        job_id="test-job-save-001",
+        title="Lead DevOps Engineer",
+        company="CloudScale Inc",
+        location="Remote",
+        site="indeed",
+        job_url="https://indeed.com/viewjob?jk=789",
+    )
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    # 1. Click "Save Job" (?status=saved)
+    resp = client.post(f"/job/{job.id}/track?status=saved")
+    assert resp.status_code == 200
+    assert "Saved" in resp.text
+    assert "View Application" in resp.text
+    assert "Applied" not in resp.text
+
+    # Verify DB state: status is saved, no applied_date yet
+    app_record = (
+        db_session.query(JobApplication).filter(JobApplication.saved_job_id == job.id).first()
+    )
+    assert app_record is not None
+    assert app_record.status == "saved"
+    assert app_record.applied_date is None
+    assert len(app_record.activities) == 1
+    assert app_record.activities[0].new_status == "saved"
+
+    # 2. Later click "Track Application" (?status=applied) to upgrade
+    resp_upgrade = client.post(f"/job/{job.id}/track?status=applied")
+    assert resp_upgrade.status_code == 200
+    assert "Applied" in resp_upgrade.text
+    assert "View Application" in resp_upgrade.text
+
+    db_session.refresh(app_record)
+    assert app_record.status == "applied"
+    assert app_record.applied_date == datetime.date.today()
+    assert len(app_record.activities) == 2
+    assert app_record.activities[0].new_status == "applied"
+
+
 def test_track_duplicate_job_idempotent(client: TestClient, db_session: Session):
     job = SavedJob(
         job_id="test-job-002",
@@ -423,7 +466,32 @@ def test_unemployment_report_and_export(client: TestClient, db_session: Session)
         method="LinkedIn",
         status="applied",
     )
-    db_session.add_all([app1, app2])
+    # Saved and cancelled applications should NOT be listed in activities for the report
+    app_saved = JobApplication(
+        company="SavedCo Technologies",
+        title="Wishlist Architect",
+        applied_date=datetime.date(2026, 9, 1),
+        method="Company Website",
+        status="saved",
+    )
+    app_cancelled = JobApplication(
+        company="Avalere Health",
+        title="Senior Medical Writer",
+        applied_date=datetime.date(2026, 9, 1),
+        method="Indeed",
+        status="cancelled",
+    )
+    db_session.add_all([app1, app2, app_saved, app_cancelled])
+    db_session.commit()
+
+    # Activity on a cancelled job should also be excluded
+    act_cancelled = ApplicationActivity(
+        application_id=app_cancelled.id,
+        activity_type="custom",
+        note="Applied to senior role instead. Cancelled.",
+        activity_date=datetime.date(2026, 9, 2),
+    )
+    db_session.add(act_cancelled)
     db_session.commit()
 
     # GET report page
@@ -433,6 +501,12 @@ def test_unemployment_report_and_export(client: TestClient, db_session: Session)
     assert "Amazon" in resp.text
     assert "Netflix" in resp.text
     assert "Week Ending: Saturday" in resp.text
+    # Ensure saved and cancelled job events are NOT listed in the report activities
+    assert "SavedCo Technologies" not in resp.text
+    assert "Wishlist Architect" not in resp.text
+    assert "Avalere Health" not in resp.text
+    assert "Senior Medical Writer" not in resp.text
+    assert "Applied to senior role instead" not in resp.text
 
     # GET CSV export
     resp_export = client.get("/applications/unemployment-report/export")
@@ -442,6 +516,10 @@ def test_unemployment_report_and_export(client: TestClient, db_session: Session)
     assert "Claim Week Ending" in csv_text
     assert "Amazon" in csv_text
     assert "Netflix" in csv_text
+    assert "SavedCo Technologies" not in csv_text
+    assert "Wishlist Architect" not in csv_text
+    assert "Avalere Health" not in csv_text
+    assert "Senior Medical Writer" not in csv_text
 
 
 def test_delete_application(client: TestClient, db_session: Session):

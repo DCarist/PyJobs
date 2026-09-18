@@ -31,6 +31,16 @@
   >
     📌 Track Application
   </button>
+  <button
+    type="button"
+    class="btn-save-job btn-small"
+    hx-post="/job/{{ job.id }}/track?status=saved"
+    hx-target="#job-actions-{{ job.id }}"
+    hx-swap="outerHTML"
+    title="Save this job to apply later"
+  >
+    💾 Save Job
+  </button>
   {% endif %}
 
   <button
