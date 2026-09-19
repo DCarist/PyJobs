@@ -31,3 +31,17 @@ Guidelines and constraints for templates, styles, and client-side interactions i
 * Target partials cleanly using `hx-target` and `hx-swap="outerHTML"` or `hx-swap="innerHTML"`.
 * For sub-components that update multiple areas, use HTMX out-of-band swaps (`hx-swap-oob="true"`).
 * Include visual indicators (`hx-indicator`) for asynchronous requests to provide responsive feedback.
+
+---
+
+## 5. Modal Dialog Viewport Positioning
+* **Viewport-Fixed Coordinates**: All `<dialog class="modal-dialog">` elements must use `position: fixed; top: 5rem; left: 50%; transform: translateX(-50%); margin: 0;` so they remain visible at the top of the viewport regardless of scroll position.
+* **Containing Block Boundary**: Modals MUST be declared outside containers that have CSS animations or transforms (e.g. `.application-detail-page` entrance animation), as transforms establish a new containing block and trap fixed descendants.
+* **Control**: Use native `dialog.showModal()` and `dialog.close()` methods with backdrop blur styling (`.modal-dialog::backdrop`).
+
+---
+
+## 6. Toast Notification Standards
+* **Container**: Global toast container `#save-status-toast` is anchored to the top-right viewport (`position: fixed; top: 1.25rem; right: 1.5rem; z-index: 999999`).
+* **Styling**: Always use the `.save-status-badge` CSS class for save feedback rather than ad-hoc inline styles.
+* **Lifecycle**: Badges support HTMX response swaps and auto-dismissal.

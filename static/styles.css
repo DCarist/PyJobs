@@ -67,6 +67,7 @@ h1 {
   font-size: 3rem;
   background: linear-gradient(135deg, #fff, var(--text-secondary));
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 0.5rem;
 }
@@ -826,6 +827,7 @@ details[open] > summary.group-summary .group-chevron {
   letter-spacing: -0.02em;
   background: linear-gradient(135deg, #ffffff 30%, #94a3b8 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   margin: 0 0 0.25rem 0;
 }
@@ -1720,7 +1722,42 @@ details[open] > summary.group-summary .group-chevron {
   inset: 0;
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   z-index: 9999;
+}
+
+/* Save Status Viewport Toast */
+.save-status-toast {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.5rem;
+  z-index: 999999;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.save-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(16, 185, 129, 0.95);
+  color: #ffffff;
+  border: 1px solid rgba(52, 211, 153, 0.6);
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.4),
+    0 0 14px rgba(16, 185, 129, 0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.45rem 1rem;
+  border-radius: 9999px;
+  pointer-events: none;
+  animation: fadeInDown 0.3s ease-out;
 }
 
 .modal-header {
@@ -1919,27 +1956,6 @@ details[open] > summary.group-summary .group-chevron {
   background: rgba(139, 92, 246, 0.15);
   color: #a78bfa;
   border: 1px solid rgba(139, 92, 246, 0.3);
-}
-
-/* ==============================================================================
-   Modal Dialog & Glassmorphic Backdrop Styles
-   ============================================================================== */
-dialog.modal-dialog {
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
-  background: #1e293b;
-  color: var(--text-primary);
-  max-width: 480px;
-  width: 90%;
-  padding: 1.5rem;
-  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6);
-  margin: auto;
-}
-
-dialog.modal-dialog::backdrop {
-  background: rgba(15, 23, 42, 0.8);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
 }
 
 /* ==============================================================================

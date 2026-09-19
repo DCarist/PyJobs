@@ -116,6 +116,7 @@ set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
 * **Dead Link Verification**: Postings verified as dead/404 via HTTP `HEAD` checks show a red `Dead Link` warning.
 * **1-Click Bulk Auto-Hide**: Hide all stale postings with a single click to keep your active pipeline clean.
 * **Active vs. Stale Filtering**: Main feed filters allow viewing `All Postings`, `Active Only`, or `Stale Only`.
+* **Hide Tracked Postings**: Instant toggle (`Hide tracked jobs`) filters out postings that are already being tracked in your pipeline (saved, applied, interviewing, cancelled, or URL-matched), with automatic cookie and localStorage state persistence across navigation.
 
 ---
 

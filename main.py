@@ -1491,17 +1491,6 @@ async def get_application_detail(request: Request, id: int, db: Session = Depend
     )
 
 
-SAVE_BADGE_STYLE = (
-    "display: inline-flex; align-items: center; gap: 0.4rem; "
-    "background: rgba(16, 185, 129, 0.95); color: #ffffff; "
-    "border: 1px solid rgba(52, 211, 153, 0.6); "
-    "box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 14px rgba(16, 185, 129, 0.4); "
-    "backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); "
-    "font-size: 0.85rem; font-weight: 600; letter-spacing: 0.02em; "
-    "padding: 0.45rem 1rem; border-radius: 9999px; pointer-events: none;"
-)
-
-
 @app.post("/applications/{id}")
 async def update_application_detail(
     id: int,
@@ -1551,9 +1540,7 @@ async def update_application_detail(
     db.commit()
 
     if request.headers.get("HX-Request"):
-        return HTMLResponse(
-            f'<div class="save-status-badge" style="{SAVE_BADGE_STYLE}">✓ Changes Saved</div>'
-        )
+        return HTMLResponse('<div class="save-status-badge">✓ Changes Saved</div>')
     return RedirectResponse(url=f"/applications/{id}?saved=Changes+Saved", status_code=303)
 
 
@@ -1611,9 +1598,7 @@ async def update_application_follow_up(
         app_record.follow_up_date = None
 
     db.commit()
-    return HTMLResponse(
-        f'<div class="save-status-badge" style="{SAVE_BADGE_STYLE}">✓ Reminder Date Saved</div>'
-    )
+    return HTMLResponse('<div class="save-status-badge">✓ Reminder Date Saved</div>')
 
 
 @app.post("/applications/{id}/description")
@@ -1889,6 +1874,44 @@ async def list_resumes(
     )
 
 
+def validate_resume_file(filename: str | None, content: bytes) -> str | None:
+    """Validates uploaded resume filename extension and content. Returns error message or None."""
+    if not filename:
+        return "No file selected."
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if ext not in ("pdf", "docx"):
+        return "Unsupported file format. Please upload a .pdf or .docx document."
+    if not content:
+        return "Uploaded file is empty."
+    return None
+
+
+def process_and_store_resume_file(
+    upload_dir: Path,
+    filename: str,
+    content: bytes,
+) -> tuple[Path, Path, str, str]:
+    """Persists uploaded file, compiles DOCX to PDF if needed, and extracts plain text.
+
+    Returns (file_path, pdf_path, ext, extracted_text).
+    """
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    file_id = uuid.uuid4().hex
+    file_path = upload_dir / f"{file_id}.{ext}"
+    file_path.write_bytes(content)
+
+    if ext in ("docx", "doc"):
+        pdf_path = upload_dir / f"{file_id}.pdf"
+        converted = convert_docx_to_pdf(file_path, pdf_path)
+        if not converted or not pdf_path.exists():
+            pdf_path = file_path
+    else:
+        pdf_path = file_path
+
+    extracted_text = extract_text(file_path, ext)
+    return file_path, pdf_path, ext, extracted_text
+
+
 @app.post("/resumes")
 async def create_resume(
     request: Request,
@@ -1901,37 +1924,15 @@ async def create_resume(
     db: Session = Depends(get_db),
 ):
     """Uploads and registers a new resume with its initial version (v1)."""
-    if not file.filename:
-        return HTMLResponse("No file selected.", status_code=400)
-
-    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
-    if ext not in ("pdf", "docx"):
-        return HTMLResponse(
-            "Unsupported file format. Please upload a .pdf or .docx document.",
-            status_code=400,
-        )
-
     content = await file.read()
-    if not content:
-        return HTMLResponse("Uploaded file is empty.", status_code=400)
+    err = validate_resume_file(file.filename, content)
+    if err:
+        return HTMLResponse(err, status_code=400)
 
     upload_dir = get_upload_dir(request.app)
-    file_id = uuid.uuid4().hex
-    stored_original = f"{file_id}.{ext}"
-    file_path = upload_dir / stored_original
-    file_path.write_bytes(content)
-
-    # If DOCX, compile to PDF
-    if ext in ("docx", "doc"):
-        pdf_stored = f"{file_id}.pdf"
-        pdf_path = upload_dir / pdf_stored
-        converted = convert_docx_to_pdf(file_path, pdf_path)
-        if not converted or not pdf_path.exists():
-            pdf_path = file_path
-    else:
-        pdf_path = file_path
-
-    extracted_text = extract_text(file_path, ext)
+    file_path, pdf_path, ext, extracted_text = process_and_store_resume_file(
+        upload_dir, file.filename or "resume.pdf", content
+    )
 
     resume = Resume(
         title=title.strip(),
@@ -1945,7 +1946,7 @@ async def create_resume(
     version = ResumeVersion(
         resume_id=resume.id,
         version_number=1,
-        original_filename=file.filename,
+        original_filename=file.filename or "resume.pdf",
         file_path=str(file_path),
         pdf_path=str(pdf_path),
         file_size=len(content),
@@ -1972,42 +1973,22 @@ async def upload_resume_version(
     if not resume:
         return HTMLResponse("Resume not found.", status_code=404)
 
-    if not file.filename:
-        return HTMLResponse("No file selected.", status_code=400)
-
-    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
-    if ext not in ("pdf", "docx"):
-        return HTMLResponse(
-            "Unsupported file format. Please upload a .pdf or .docx document.",
-            status_code=400,
-        )
-
     content = await file.read()
-    if not content:
-        return HTMLResponse("Uploaded file is empty.", status_code=400)
+    err = validate_resume_file(file.filename, content)
+    if err:
+        return HTMLResponse(err, status_code=400)
 
     upload_dir = get_upload_dir(request.app)
-    file_id = uuid.uuid4().hex
-    stored_original = f"{file_id}.{ext}"
-    file_path = upload_dir / stored_original
-    file_path.write_bytes(content)
+    file_path, pdf_path, ext, extracted_text = process_and_store_resume_file(
+        upload_dir, file.filename or "resume.pdf", content
+    )
 
-    if ext in ("docx", "doc"):
-        pdf_stored = f"{file_id}.pdf"
-        pdf_path = upload_dir / pdf_stored
-        converted = convert_docx_to_pdf(file_path, pdf_path)
-        if not converted or not pdf_path.exists():
-            pdf_path = file_path
-    else:
-        pdf_path = file_path
-
-    extracted_text = extract_text(file_path, ext)
     next_version = max([v.version_number for v in resume.versions], default=0) + 1
 
     version = ResumeVersion(
         resume_id=resume.id,
         version_number=next_version,
-        original_filename=file.filename,
+        original_filename=file.filename or "resume.pdf",
         file_path=str(file_path),
         pdf_path=str(pdf_path),
         file_size=len(content),
