@@ -12,6 +12,19 @@ from pyjobs.services.task_manager import TASKS, launch_scrape_task
 
 logger = logging.getLogger("pyjobs.scheduler")
 
+VALID_REFRESH_INTERVALS: tuple[int, ...] = (0, 6, 12, 24, 72, 120, 168)
+
+
+def format_interval_description(hours: int) -> str:
+    """Returns human-readable representation of a schedule interval."""
+    if hours <= 0:
+        return "manual only"
+    if hours % 24 == 0:
+        days = hours // 24
+        return f"every {days} day{'s' if days > 1 else ''} ({hours}h)"
+    return f"every {hours}h"
+
+
 _scheduler_task: asyncio.Task | None = None
 _running: bool = False
 
@@ -47,9 +60,9 @@ async def _check_and_run_scheduled_profiles(session_factory: Callable[[], Sessio
                 )
                 if not is_active:
                     logger.info(
-                        "Triggering scheduled refresh for profile '%s' (every %dh)",
+                        "Triggering scheduled refresh for profile '%s' (%s)",
                         profile.name,
-                        profile.refresh_interval_hours,
+                        format_interval_description(profile.refresh_interval_hours),
                     )
                     await launch_scrape_task(profile.id, session_factory, profile.name)
 

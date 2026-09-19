@@ -185,6 +185,18 @@
         <option value="24" selected>Daily (Every 24h)</option>
         {% else %}
         <option value="24">Daily (Every 24h)</option>
+        {% endif %} {% if intv == 72 %}
+        <option value="72" selected>Every 3 Days (72h)</option>
+        {% else %}
+        <option value="72">Every 3 Days (72h)</option>
+        {% endif %} {% if intv == 120 %}
+        <option value="120" selected>Every 5 Days (120h)</option>
+        {% else %}
+        <option value="120">Every 5 Days (120h)</option>
+        {% endif %} {% if intv == 168 %}
+        <option value="168" selected>Every 7 Days (Weekly)</option>
+        {% else %}
+        <option value="168">Every 7 Days (Weekly)</option>
         {% endif %}
       </select>
 

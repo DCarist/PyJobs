@@ -128,7 +128,7 @@ set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
 * **Instant Feed Refresh**: Out-of-band DOM swap immediately updates the job results view upon scrape completion.
 
 ### Automated Scheduling & Background Refresh
-* **Per-Profile Intervals**: Configure automated background refreshes every 1, 6, 12, or 24 hours.
+* **Per-Profile Intervals**: Configure automated background refreshes (Manual, 6h, 12h, 24h / Daily, 3 days, 5 days, or 7 days / Weekly).
 * **Launch Check**: Mark profiles to scrape immediately on application launch (`refresh_on_launch`).
 * **In-App Scheduler**: Lightweight asyncio lifespan scheduler checks eligible profiles without requiring external cron daemons.
 

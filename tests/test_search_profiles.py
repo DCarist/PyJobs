@@ -245,3 +245,85 @@ def test_profile_sidebar_unsaved_modal_markup(client, db_session):
     assert 'id="modal-scrape-without-saving"' in res.text
     assert f"window.scrapeWithoutSaving('{p.id}')" in res.text
     assert 'id="modal-cancel-scrape"' in res.text
+
+
+def test_search_profile_multi_day_schedule_options(client, db_session):
+    # 1. Create profile with 3-day (72h) refresh schedule
+    create_res = client.post(
+        "/profiles",
+        data={
+            "name": "3-Day Refresh Profile",
+            "positions": "Data Scientist",
+            "refresh_interval_hours": 72,
+        },
+    )
+    assert create_res.status_code == 200
+    p = (
+        db_session.query(SearchProfile)
+        .filter(SearchProfile.name == "3-Day Refresh Profile")
+        .first()
+    )
+    assert p is not None
+    assert p.refresh_interval_hours == 72
+
+    # 2. Update profile to 5-day (120h) refresh schedule
+    update_res = client.post(
+        f"/profiles/{p.id}",
+        data={
+            "name": "5-Day Refresh Profile",
+            "refresh_interval_hours": 120,
+        },
+    )
+    assert update_res.status_code == 200
+    db_session.refresh(p)
+    assert p.refresh_interval_hours == 120
+
+    # 3. Update profile to 7-day / weekly (168h) refresh schedule
+    update_res_7d = client.post(
+        f"/profiles/{p.id}",
+        data={
+            "name": "Weekly Refresh Profile",
+            "refresh_interval_hours": 168,
+        },
+    )
+    assert update_res_7d.status_code == 200
+    db_session.refresh(p)
+    assert p.refresh_interval_hours == 168
+
+    # 4. Verify negative interval is clamped to 0 (manual only)
+    clamp_res = client.post(
+        f"/profiles/{p.id}",
+        data={
+            "name": "Clamped Profile",
+            "refresh_interval_hours": -5,
+        },
+    )
+    assert clamp_res.status_code == 200
+    db_session.refresh(p)
+    assert p.refresh_interval_hours == 0
+
+
+def test_profile_sidebar_schedule_dropdown_markup(client, db_session):
+    p = SearchProfile(
+        name="Scheduled Profile",
+        positions="ML Engineer",
+        refresh_interval_hours=72,
+    )
+    db_session.add(p)
+    db_session.commit()
+
+    res = client.get(f"/profiles/sidebar?profile_id={p.id}")
+    assert res.status_code == 200
+
+    # Verify all schedule interval options are rendered
+    assert '<option value="0"' in res.text
+    assert "Manual Only" in res.text
+    assert '<option value="6"' in res.text
+    assert "Every 6 Hours" in res.text
+    assert '<option value="12"' in res.text
+    assert "Every 12 Hours" in res.text
+    assert '<option value="24"' in res.text
+    assert "Daily (Every 24h)" in res.text
+    assert '<option value="72" selected>Every 3 Days (72h)</option>' in res.text
+    assert '<option value="120">Every 5 Days (120h)</option>' in res.text
+    assert '<option value="168">Every 7 Days (Weekly)</option>' in res.text

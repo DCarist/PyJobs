@@ -62,6 +62,8 @@ async def create_search_profile(
     db: Session = Depends(get_db),
 ):
     sites_str = ",".join(sites) if sites else "linkedin,indeed,google"
+    if refresh_interval_hours < 0:
+        refresh_interval_hours = 0
     new_profile = SearchProfile(
         name=name.strip() or "Untitled Profile",
         positions=positions.strip(),
@@ -120,7 +122,7 @@ async def update_search_profile(
     profile.is_remote = is_remote
     profile.distance_miles = distance_miles
     profile.results_wanted = results_wanted
-    profile.refresh_interval_hours = refresh_interval_hours
+    profile.refresh_interval_hours = max(0, refresh_interval_hours)
     profile.refresh_on_launch = refresh_on_launch
     db.commit()
 
