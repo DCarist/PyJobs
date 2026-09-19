@@ -271,6 +271,24 @@
       </div>
     </div>
 
+    <!-- Resume Version Attachment -->
+    <div class="form-group" style="margin-top: 0.75rem;">
+      <label for="manual-resume-version">Resume Version Submitted</label>
+      <select id="manual-resume-version" name="resume_version_id" style="width: 100%;">
+        <option value="">-- None / Not Attached --</option>
+        {% for r in resumes %} {% if r.versions %}
+        <optgroup label="{{ r.title }}">
+          {% for v in r.versions %}
+          <option value="{{ v.id }}">
+            {{ r.title }} (v{{ v.version_number }}) - {{ v.file_type|upper }} ({{
+            v.created_at.strftime('%b %d, %Y') }})
+          </option>
+          {% endfor %}
+        </optgroup>
+        {% endif %} {% endfor %}
+      </select>
+    </div>
+
     <div class="form-group" style="margin-top: 0.75rem;">
       <label for="manual-description">Job Description (Snapshot / Notes)</label>
       <textarea

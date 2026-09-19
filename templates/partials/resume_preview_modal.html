@@ -1,0 +1,88 @@
+<div class="resume-preview-container">
+  <div class="preview-header">
+    <div>
+      <h3 style="margin: 0 0 0.25rem 0; font-size: 1.25rem;">
+        {{ resume.title }} <span class="badge version-badge">v{{ version.version_number }}</span>
+      </h3>
+      <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">
+        Original: <strong>{{ version.original_filename }}</strong> ({{ (version.file_size /
+        1024)|round(1) }} KB) &bull; Uploaded: {{ version.created_at.strftime('%B %d, %Y') }}
+      </p>
+    </div>
+    <div class="preview-tabs">
+      <button
+        type="button"
+        id="tab-btn-pdf"
+        class="tab-btn active"
+        onclick="document.getElementById('pdf-view-panel').style.display='block'; document.getElementById('text-view-panel').style.display='none'; this.classList.add('active'); document.getElementById('tab-btn-text').classList.remove('active');"
+      >
+        📄 PDF Viewer
+      </button>
+      <button
+        type="button"
+        id="tab-btn-text"
+        class="tab-btn"
+        onclick="document.getElementById('text-view-panel').style.display='block'; document.getElementById('pdf-view-panel').style.display='none'; this.classList.add('active'); document.getElementById('tab-btn-pdf').classList.remove('active');"
+      >
+        📝 Extracted Text (ATS)
+      </button>
+    </div>
+  </div>
+
+  <!-- Panel 1: Native In-Browser PDF Viewer -->
+  <div id="pdf-view-panel" class="preview-panel" style="display: block;">
+    <iframe
+      src="/resumes/versions/{{ version.id }}/view#toolbar=1"
+      class="resume-pdf-iframe"
+      title="In-Browser PDF Viewer for {{ resume.title }}"
+    ></iframe>
+  </div>
+
+  <!-- Panel 2: Plain Text / ATS Content -->
+  <div id="text-view-panel" class="preview-panel" style="display: none;">
+    <div class="resume-text-view">
+      <pre
+      ><code>{{ version.extracted_text if version.extracted_text else 'No text could be extracted from this document.' }}</code></pre>
+    </div>
+  </div>
+
+  <div
+    class="preview-footer"
+    style="margin-top: 1rem; display: flex; justify-content: space-between; align-items: center;"
+  >
+    <div>
+      {% if version.change_notes %}
+      <span style="font-size: 0.85rem; color: var(--text-secondary);">
+        <strong>Version notes:</strong>
+        {{ version.change_notes }}
+      </span>
+      {% endif %}
+    </div>
+    <div style="display: flex; gap: 0.75rem;">
+      <a
+        href="/resumes/versions/{{ version.id }}/download?format=pdf"
+        class="btn-primary"
+        style="padding: 0.45rem 1rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem;"
+      >
+        <span>⬇ Download PDF</span>
+      </a>
+      {% if version.file_type == 'docx' %}
+      <a
+        href="/resumes/versions/{{ version.id }}/download?format=original"
+        class="btn-secondary"
+        style="padding: 0.45rem 1rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem;"
+      >
+        <span>⬇ Download DOCX</span>
+      </a>
+      {% endif %}
+      <button
+        type="button"
+        class="btn-secondary"
+        style="padding: 0.45rem 1rem; font-size: 0.85rem;"
+        onclick="document.getElementById('preview-dialog').close()"
+      >
+        Close
+      </button>
+    </div>
+  </div>
+</div>

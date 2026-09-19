@@ -12,3 +12,7 @@ pyjobs.db
 *.db-journal
 *.db-wal
 .env
+
+# Uploaded documents
+/uploads/
+uploads/

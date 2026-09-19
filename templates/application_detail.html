@@ -15,6 +15,14 @@
         <span>Open Original Posting ↗</span>
       </a>
       {% endif %}
+      <button
+        type="button"
+        class="btn-secondary btn-small"
+        onclick="document.getElementById('edit-job-dialog').showModal()"
+        title="Edit job title, company, location, salary, or link"
+      >
+        <span>✏️ Edit Job Info</span>
+      </button>
       <form
         method="post"
         action="/applications/{{ application.id }}/delete"
@@ -37,7 +45,17 @@
         <span class="badge salary-badge"> 💰 {{ application.salary_stated }} </span>
         {% endif %}
       </div>
-      <h2 class="detail-title">{{ application.title or "Untitled Position" }}</h2>
+      <div class="detail-title-row">
+        <h2 class="detail-title">{{ application.title or "Untitled Position" }}</h2>
+        <button
+          type="button"
+          class="btn-secondary btn-tiny btn-edit-job"
+          onclick="document.getElementById('edit-job-dialog').showModal()"
+          title="Edit Job Information"
+        >
+          ✏️ Edit Info
+        </button>
+      </div>
       <h3 class="detail-company">
         {{ application.company }} {% if application.location %}
         <span class="detail-location">· 📍 {{ application.location }}</span>
@@ -83,7 +101,19 @@
       <!-- Follow-up & Compliance Settings -->
       <div class="glass-panel detail-card">
         <h3 class="card-title">⏰ Follow-up & Compliance</h3>
-        <form method="post" action="/applications/{{ application.id }}">
+        <form
+          id="compliance-settings-form"
+          method="post"
+          action="/applications/{{ application.id }}"
+          hx-post="/applications/{{ application.id }}"
+          hx-target="#save-status-toast"
+          hx-swap="innerHTML"
+        >
+          <input
+            type="hidden"
+            name="resume_version_id"
+            value="{{ application.resume_version_id or '' }}"
+          >
           <div class="form-group">
             <label for="applied-date-input">Date Applied</label>
             <input
@@ -91,6 +121,11 @@
               id="applied-date-input"
               name="applied_date"
               value="{{ application.applied_date.strftime('%Y-%m-%d') if application.applied_date else '' }}"
+              hx-post="/applications/{{ application.id }}"
+              hx-trigger="change"
+              hx-include="#compliance-settings-form"
+              hx-target="#save-status-toast"
+              hx-swap="innerHTML"
             >
           </div>
 
@@ -103,9 +138,15 @@
                 onclick="
                   const d = new Date();
                   d.setDate(d.getDate() + 14);
-                  document.getElementById('follow-up-date-input').value = d.toISOString().split('T')[0];
+                  const inp = document.getElementById('follow-up-date-input');
+                  inp.value = d.toISOString().split('T')[0];
+                  if (window.htmx) {
+                    htmx.trigger(inp, 'change');
+                  } else {
+                    inp.dispatchEvent(new Event('change', { bubbles: true }));
+                  }
                 "
-                title="Quick set to 14 days from today"
+                title="Quick set to 14 days from today and auto-save"
               >
                 +2 Weeks
               </button>
@@ -116,12 +157,24 @@
               name="follow_up_date"
               value="{{ application.follow_up_date.strftime('%Y-%m-%d') if application.follow_up_date else '' }}"
               style="margin-top: 0.35rem;"
+              hx-post="/applications/{{ application.id }}/follow-up"
+              hx-trigger="change"
+              hx-target="#save-status-toast"
+              hx-swap="innerHTML"
             >
           </div>
 
           <div class="form-group" style="margin-top: 0.85rem;">
             <label for="method-input">Application Method</label>
-            <select id="method-input" name="method">
+            <select
+              id="method-input"
+              name="method"
+              hx-post="/applications/{{ application.id }}"
+              hx-trigger="change"
+              hx-include="#compliance-settings-form"
+              hx-target="#save-status-toast"
+              hx-swap="innerHTML"
+            >
               {% for m in ['Company Website', 'LinkedIn', 'Indeed', 'Google Jobs', 'Referral',
               'Recruiter', 'Email', 'Other'] %} {% if application.method == m %}
               <option value="{{ m }}" selected>{{ m }}</option>
@@ -145,9 +198,24 @@
                 name="account_created"
                 value="true"
                 checked
+                hx-post="/applications/{{ application.id }}"
+                hx-trigger="change"
+                hx-include="#compliance-settings-form"
+                hx-target="#save-status-toast"
+                hx-swap="innerHTML"
               >
               {% else %}
-              <input type="checkbox" id="account-created-check" name="account_created" value="true">
+              <input
+                type="checkbox"
+                id="account-created-check"
+                name="account_created"
+                value="true"
+                hx-post="/applications/{{ application.id }}"
+                hx-trigger="change"
+                hx-include="#compliance-settings-form"
+                hx-target="#save-status-toast"
+                hx-swap="innerHTML"
+              >
               {% endif %}
               <span style="font-weight: 500;">Applicant Portal Account Created</span>
             </label>
@@ -162,6 +230,11 @@
                 name="portal_username"
                 value="{{ application.portal_username or '' }}"
                 placeholder="e.g. yourname@gmail.com"
+                hx-post="/applications/{{ application.id }}"
+                hx-trigger="change"
+                hx-include="#compliance-settings-form"
+                hx-target="#save-status-toast"
+                hx-swap="innerHTML"
               >
             </div>
 
@@ -175,12 +248,161 @@
                 name="confirmation_number"
                 value="{{ application.confirmation_number or '' }}"
                 placeholder="e.g. REQ-10492"
+                hx-post="/applications/{{ application.id }}"
+                hx-trigger="change"
+                hx-include="#compliance-settings-form"
+                hx-target="#save-status-toast"
+                hx-swap="innerHTML"
               >
             </div>
           </div>
 
           <div style="margin-top: 1rem; text-align: right;">
             <button type="submit" class="btn-primary btn-small">Save Settings</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Submitted Resume & Version Attachment -->
+      <div class="glass-panel detail-card" style="margin-top: 1.5rem;">
+        <h3 class="card-title">📄 Submitted Resume</h3>
+        {% if application.resume_version %}
+        <div
+          style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color); border-radius: 10px; padding: 1rem; margin-bottom: 1rem;"
+        >
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <div style="font-weight: 700; font-size: 1rem; color: var(--text-primary);">
+                {{ application.resume_version.resume.title }}
+                <span class="badge version-badge"
+                  >v{{ application.resume_version.version_number }}</span
+                >
+                <span class="badge format-badge format-{{ application.resume_version.file_type }}"
+                  >{{ application.resume_version.file_type|upper }}</span
+                >
+              </div>
+              <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                {{ application.resume_version.original_filename }} &bull; Uploaded {{
+                application.resume_version.created_at.strftime('%b %d, %Y') }}
+              </div>
+            </div>
+            <span class="badge pdf-ready-badge">✅ PDF Ready</span>
+          </div>
+
+          {% if application.resume_version.change_notes %}
+          <div
+            style="margin-top: 0.6rem; font-size: 0.8rem; color: var(--accent-light); font-style: italic;"
+          >
+            "{{ application.resume_version.change_notes }}"
+          </div>
+          {% endif %}
+
+          <div style="margin-top: 0.85rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <a
+              href="/resumes/versions/{{ application.resume_version.id }}/view"
+              target="_blank"
+              class="btn-primary btn-tiny"
+              style="text-decoration: none;"
+            >
+              👁 View PDF
+            </a>
+            <a
+              href="/resumes/versions/{{ application.resume_version.id }}/download?format=pdf"
+              class="btn-secondary btn-tiny"
+              style="text-decoration: none;"
+            >
+              ⬇ Download PDF
+            </a>
+            {% if application.resume_version.file_type == 'docx' %}
+            <a
+              href="/resumes/versions/{{ application.resume_version.id }}/download?format=original"
+              class="btn-secondary btn-tiny"
+              style="text-decoration: none;"
+            >
+              ⬇ Download DOCX
+            </a>
+            {% endif %}
+          </div>
+        </div>
+        {% else %}
+        <div
+          style="text-align: center; padding: 1rem; color: var(--text-secondary); font-size: 0.9rem;"
+        >
+          No resume version currently linked to this application.
+        </div>
+        {% endif %}
+
+        <!-- Switch or Attach Resume Form -->
+        <form method="post" action="/applications/{{ application.id }}">
+          <input
+            type="hidden"
+            name="applied_date"
+            value="{{ application.applied_date.strftime('%Y-%m-%d') if application.applied_date else '' }}"
+          >
+          <input
+            type="hidden"
+            name="follow_up_date"
+            value="{{ application.follow_up_date.strftime('%Y-%m-%d') if application.follow_up_date else '' }}"
+          >
+          <input type="hidden" name="method" value="{{ application.method }}">
+          <input
+            type="hidden"
+            name="account_created"
+            value="{{ 'true' if application.account_created else 'false' }}"
+          >
+          <input
+            type="hidden"
+            name="portal_username"
+            value="{{ application.portal_username or '' }}"
+          >
+          <input
+            type="hidden"
+            name="confirmation_number"
+            value="{{ application.confirmation_number or '' }}"
+          >
+
+          <div class="form-group">
+            <label for="detail-resume-version" style="font-size: 0.85rem;">
+              {{ 'Change Linked Resume Version' if application.resume_version else 'Attach Resume
+              Version' }}
+            </label>
+            <select
+              id="detail-resume-version"
+              name="resume_version_id"
+              style="width: 100%; margin-top: 0.35rem;"
+            >
+              <option value="">-- No Resume Attached --</option>
+              {% for r in resumes %} {% if r.versions %}
+              <optgroup label="{{ r.title }}">
+                {% for v in r.versions %} {% if application.resume_version_id == v.id %}
+                <option value="{{ v.id }}" selected>
+                  {{ r.title }} (v{{ v.version_number }}) - {{ v.file_type|upper }}
+                </option>
+                {% else %}
+                <option value="{{ v.id }}">
+                  {{ r.title }} (v{{ v.version_number }}) - {{ v.file_type|upper }}
+                </option>
+                {% endif %} {% endfor %}
+              </optgroup>
+              {% endif %} {% endfor %}
+            </select>
+          </div>
+
+          {% if matching_resumes %}
+          <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);">
+            Suggested for this role: {% for mr, score in matching_resumes[:2] %}
+            <span
+              class="badge"
+              style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);"
+            >
+              {{ mr.title }} ({{ (score * 100)|round }}% match)
+            </span>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          <div style="margin-top: 0.75rem; text-align: right;">
+            <button type="submit" class="btn-secondary btn-small">Update Resume Link</button>
           </div>
         </form>
       </div>
@@ -322,4 +544,99 @@
     </div>
   </div>
 </div>
+
+<!-- Edit Job Info Modal Dialog -->
+<dialog id="edit-job-dialog" class="modal-dialog glass-panel" style="max-width: 580px;">
+  <div class="modal-header">
+    <h3 style="margin: 0; font-size: 1.25rem;">✏️ Edit Job Information</h3>
+    <button
+      type="button"
+      class="btn-icon"
+      onclick="document.getElementById('edit-job-dialog').close()"
+      title="Close modal"
+    >
+      ✕
+    </button>
+  </div>
+
+  <form
+    method="post"
+    action="/applications/{{ application.id }}/job-info"
+    class="modal-body"
+    style="margin-top: 1rem;"
+  >
+    <div class="form-grid-2">
+      <div class="form-group">
+        <label for="edit-job-company">Company Name *</label>
+        <input
+          type="text"
+          id="edit-job-company"
+          name="company"
+          required
+          value="{{ '' if application.company == 'None' else application.company }}"
+          placeholder="e.g. Acme Health"
+        >
+      </div>
+      <div class="form-group">
+        <label for="edit-job-title">Job Title *</label>
+        <input
+          type="text"
+          id="edit-job-title"
+          name="title"
+          required
+          value="{{ application.title or '' }}"
+          placeholder="e.g. Senior Software Engineer"
+        >
+      </div>
+    </div>
+
+    <div class="form-grid-2" style="margin-top: 0.75rem;">
+      <div class="form-group">
+        <label for="edit-job-location">Location</label>
+        <input
+          type="text"
+          id="edit-job-location"
+          name="location"
+          value="{{ application.location or '' }}"
+          placeholder="e.g. Chesterbrook, PA, US"
+        >
+      </div>
+      <div class="form-group">
+        <label for="edit-job-salary">Salary Range / Bracket</label>
+        <input
+          type="text"
+          id="edit-job-salary"
+          name="salary_stated"
+          value="{{ application.salary_stated or '' }}"
+          placeholder="e.g. $160k - $200k"
+        >
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-top: 0.75rem;">
+      <label for="edit-job-url">Job Posting URL</label>
+      <input
+        type="url"
+        id="edit-job-url"
+        name="job_url"
+        value="{{ application.job_url or '' }}"
+        placeholder="https://..."
+      >
+    </div>
+
+    <div
+      class="modal-footer"
+      style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;"
+    >
+      <button
+        type="button"
+        class="btn-secondary"
+        onclick="document.getElementById('edit-job-dialog').close()"
+      >
+        Cancel
+      </button>
+      <button type="submit" class="btn-primary">Save Changes</button>
+    </div>
+  </form>
+</dialog>
 {% endblock %}

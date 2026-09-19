@@ -1,0 +1,934 @@
+{% extends "base.html" %} {% block content %}
+<div class="resumes-dashboard">
+  <!-- Top Header & Action Row -->
+  <div class="dashboard-header">
+    <div>
+      <h2 style="margin: 0 0 0.25rem 0; font-size: 1.75rem;">Resume Management & Versioning</h2>
+      <p class="section-subtitle" style="margin: 0;">
+        Curate targeted resume profiles, manage chronological revisions, preview PDFs in-browser,
+        and retrieve files with auto-dated filenames.
+      </p>
+    </div>
+
+    <div class="dashboard-actions" style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+      <button
+        type="button"
+        class="btn-secondary"
+        onclick="document.getElementById('naming-settings-dialog').showModal()"
+        title="Customize automatic candidate naming and date formatting"
+      >
+        <span>⚙ Retrieval Naming Settings</span>
+      </button>
+
+      <button
+        type="button"
+        class="btn-primary"
+        onclick="document.getElementById('upload-resume-dialog').showModal()"
+        title="Upload a new resume profile with initial version"
+      >
+        <span>+ Upload Resume</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Metric Overview Cards -->
+  <div class="metrics-grid" style="margin-top: 1.25rem;">
+    <div class="metric-card glass-panel">
+      <div class="metric-label">Resume Profiles</div>
+      <div class="metric-value">{{ resumes|length }}</div>
+      <div class="metric-trend">Targeted roles</div>
+    </div>
+    <div class="metric-card glass-panel">
+      <div class="metric-label">Total Versions</div>
+      <div class="metric-value">
+        {% set total_v = namespace(count=0) %} {% for r in resumes %}{% set total_v.count =
+        total_v.count + (r.versions|length) %}{% endfor %} {{ total_v.count }}
+      </div>
+      <div class="metric-trend" style="color: var(--primary);">Document iterations</div>
+    </div>
+    <div class="metric-card glass-panel">
+      <div class="metric-label">PDF Ready</div>
+      <div class="metric-value" style="color: #10b981;">100%</div>
+      <div class="metric-trend" style="color: #10b981;">In-browser viewable</div>
+    </div>
+    <div class="metric-card glass-panel">
+      <div class="metric-label">Categorized Tags</div>
+      <div class="metric-value" style="color: #a78bfa;">{{ tags|length }}</div>
+      <div class="metric-trend">Skills & job types</div>
+    </div>
+  </div>
+
+  <!-- Filter & Search Toolbar -->
+  <div class="applications-toolbar glass-panel" style="margin-top: 1.5rem; padding: 1rem 1.5rem;">
+    <form
+      method="get"
+      action="/resumes"
+      style="display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; align-items: center; width: 100%;"
+    >
+      <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; flex: 1; max-width: 650px;">
+        <input
+          type="text"
+          name="q"
+          value="{{ q }}"
+          class="search-input"
+          placeholder="Search resumes by title, target role, tags, or description..."
+          style="min-width: 280px; flex: 1;"
+        >
+        {% if active_tag and active_tag != 'all' %}
+        <input type="hidden" name="tag" value="{{ active_tag }}">
+        {% endif %} {% if active_person and active_person != 'all' %}
+        <input type="hidden" name="person" value="{{ active_person }}">
+        {% endif %}
+        <button type="submit" class="btn-primary" style="padding: 0.5rem 1rem;">Search</button>
+        {% if q or (active_tag and active_tag != 'all') or (active_person and active_person !=
+        'all') %}
+        <a
+          href="/resumes"
+          class="btn-secondary"
+          style="padding: 0.5rem 0.85rem; text-decoration: none;"
+        >
+          Clear
+        </a>
+        {% endif %}
+      </div>
+
+      <div style="font-size: 0.85rem; color: var(--text-secondary);">
+        Pattern:
+        <code style="color: var(--accent-light);"
+          >{{ pref.resume_filename_pattern if pref and pref.resume_filename_pattern else '{name}
+          {date}.{ext}' }}</code
+        >
+      </div>
+    </form>
+  </div>
+
+  <!-- Person Filter Bar -->
+  {% if people %}
+  <div
+    class="person-pill-container"
+    style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; align-items: center;"
+  >
+    <span
+      style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-right: 0.25rem;"
+      >Filter by Person:</span
+    >
+    <a
+      href="/resumes?person=all{% if active_tag and active_tag != 'all' %}&tag={{ active_tag }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+      class="resume-tag-pill {% if active_person == 'all' or not active_person %}active{% endif %}"
+    >
+      All Resumes ({{ all_resumes_count }})
+    </a>
+    {% for p in people %}
+    <a
+      href="/resumes?person={{ p }}{% if active_tag and active_tag != 'all' %}&tag={{ active_tag }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+      class="resume-tag-pill {% if active_person == p %}active{% endif %}"
+    >
+      👤 {{ p }}
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Tag Pill Filter Bar -->
+  {% if tags %}
+  <div
+    class="tag-pill-container"
+    style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; align-items: center;"
+  >
+    <span
+      style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-right: 0.25rem;"
+      >Filter by Tag:</span
+    >
+    <a
+      href="/resumes?tag=all{% if active_person and active_person != 'all' %}&person={{ active_person }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+      class="resume-tag-pill {% if active_tag == 'all' or not active_tag %}active{% endif %}"
+    >
+      All Tags
+    </a>
+    {% for t in tags %}
+    <a
+      href="/resumes?tag={{ t }}{% if active_person and active_person != 'all' %}&person={{ active_person }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+      class="resume-tag-pill {% if active_tag == t %}active{% endif %}"
+    >
+      {{ t }}
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Resumes Grid -->
+  <div class="resumes-grid" style="margin-top: 1.5rem;">
+    {% if not resumes %}
+    <div class="glass-panel" style="padding: 3rem; text-align: center; border-radius: 16px;">
+      <div style="font-size: 3rem; margin-bottom: 1rem;">📄</div>
+      <h3 style="margin: 0 0 0.5rem 0; font-size: 1.35rem;">No Resumes Found</h3>
+      <p style="color: var(--text-secondary); max-width: 500px; margin: 0 auto 1.5rem auto;">
+        {% if q or (active_tag and active_tag != 'all') or (active_person and active_person !=
+        'all') %} No resumes matched your search query or filters. Try resetting your search. {%
+        else %} Upload your first resume in PDF or Word (.docx) format to enable version tracking,
+        in-browser PDF viewing, and automated ATS keyword analysis. {% endif %}
+      </p>
+      <button
+        type="button"
+        class="btn-primary"
+        onclick="document.getElementById('upload-resume-dialog').showModal()"
+        style="padding: 0.6rem 1.5rem;"
+      >
+        <span>+ Upload Your First Resume</span>
+      </button>
+    </div>
+    {% else %}
+    <div
+      style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1.25rem;"
+    >
+      {% for resume in resumes %} {% set latest = resume.versions[0] if resume.versions else none %}
+      <div class="resume-card glass-panel" id="resume-card-{{ resume.id }}">
+        <!-- Resume Card Header -->
+        <div class="resume-card-header">
+          <div>
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+              <h3 class="resume-card-title" style="margin: 0;">{{ resume.title }}</h3>
+              {% if resume.person %}
+              <span class="resume-person-badge">👤 {{ resume.person }}</span>
+              {% endif %}
+            </div>
+            {% if resume.description %}
+            <p class="resume-card-description" style="margin-top: 0.25rem;">
+              {{ resume.description }}
+            </p>
+            {% endif %}
+          </div>
+          <div
+            class="resume-card-actions"
+            style="display: flex; gap: 0.35rem; align-items: center;"
+          >
+            <button
+              type="button"
+              class="btn-icon-secondary"
+              onclick="openEditResumeModal('{{ resume.id }}', '{{ resume.title|escape }}', '{{ (resume.person or '')|escape }}', '{{ (resume.tags or '')|escape }}', '{{ (resume.description or '')|escape }}')"
+              title="Edit resume profile and person"
+            >
+              ✏️
+            </button>
+            <button
+              type="button"
+              class="btn-icon-danger"
+              hx-delete="/resumes/{{ resume.id }}"
+              hx-confirm="Are you sure you want to delete '{{ resume.title }}' and all {{ resume.versions|length }} version(s)? This will delete physical files from disk."
+              hx-target="#resume-card-{{ resume.id }}"
+              hx-swap="outerHTML"
+              title="Delete entire resume profile"
+            >
+              🗑
+            </button>
+          </div>
+        </div>
+
+        <!-- Tags -->
+        {% if resume.tags %}
+        <div class="resume-tags-row">
+          {% for t in resume.tags.split(',') %} {% if t.strip() %}
+          <span class="badge resume-tag-badge">{{ t.strip() }}</span>
+          {% endif %} {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Latest Version Block -->
+        {% if latest %}
+        <div class="latest-version-box glass-panel">
+          <div class="version-meta-row">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span class="badge version-badge">v{{ latest.version_number }} (Latest)</span>
+              <span class="badge format-badge format-{{ latest.file_type }}"
+                >{{ latest.file_type|upper }}</span
+              >
+              <span
+                class="badge pdf-ready-badge"
+                title="Guaranteed PDF viewable in-browser and exportable"
+                >✅ PDF Ready</span
+              >
+            </div>
+            <span class="version-date">{{ latest.created_at.strftime('%b %d, %Y') }}</span>
+          </div>
+
+          <div class="version-meta-file-row">
+            <span
+              class="version-meta-filename"
+              title="Original file name: {{ latest.original_filename }}"
+              >{{ latest.original_filename }}</span
+            >
+            <span class="version-meta-filesize">{{ (latest.file_size / 1024)|round(1) }} KB</span>
+          </div>
+
+          {% if latest.change_notes %}
+          <div class="version-notes-callout">"{{ latest.change_notes }}"</div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Card Action Buttons -->
+        <div class="resume-card-buttons">
+          {% if latest %}
+          <button
+            type="button"
+            class="btn-primary btn-action"
+            hx-get="/resumes/versions/{{ latest.id }}/preview"
+            hx-target="#preview-dialog-content"
+            onclick="document.getElementById('preview-dialog').showModal()"
+            title="View PDF directly in browser"
+          >
+            <span>👁 View PDF</span>
+          </button>
+
+          <button
+            type="button"
+            class="btn-secondary btn-action"
+            onclick="window.location.href='/resumes/versions/{{ latest.id }}/download?format=original'"
+            title="1-Click Download using customized retrieval name"
+          >
+            <span>⬇ Download</span>
+          </button>
+
+          <button
+            type="button"
+            class="btn-secondary btn-action"
+            onclick="openCustomDownloadModal('{{ latest.id }}', '{{ resume.title|escape }}', '{{ latest.version_number }}', '{{ latest.file_type }}', '{{ (resume.person or '')|escape }}')"
+            title="Customize retrieval filename or choose format"
+          >
+            <span>⚙ Custom...</span>
+          </button>
+          {% endif %}
+
+          <button
+            type="button"
+            class="btn-secondary btn-action"
+            onclick="openUploadVersionModal('{{ resume.id }}', '{{ resume.title }}', '{{ (latest.version_number + 1) if latest else 1 }}')"
+            title="Upload a new chronological version"
+          >
+            <span>⬆ New Version</span>
+          </button>
+        </div>
+
+        <!-- Collapsible Version History -->
+        {% if resume.versions|length > 1 %}
+        <details class="version-history-details">
+          <summary class="version-history-summary">
+            <span>🕒 Version History ({{ resume.versions|length }} versions)</span>
+          </summary>
+          <div class="version-history-list">
+            {% for v in resume.versions %}
+            <div class="version-history-item" id="version-row-{{ v.id }}">
+              <div class="version-history-left">
+                <strong>v{{ v.version_number }}</strong>
+                <span class="badge format-badge format-{{ v.file_type }}"
+                  >{{ v.file_type|upper }}</span
+                >
+                <span style="color: var(--text-secondary); font-size: 0.75rem;"
+                  >{{ v.created_at.strftime('%b %d, %Y') }}</span
+                >
+                {% if v.change_notes %}
+                <span class="history-note">&mdash; {{ v.change_notes }}</span>
+                {% endif %}
+              </div>
+              <div class="version-history-actions">
+                <button
+                  type="button"
+                  class="btn-link"
+                  hx-get="/resumes/versions/{{ v.id }}/preview"
+                  hx-target="#preview-dialog-content"
+                  onclick="document.getElementById('preview-dialog').showModal()"
+                >
+                  View
+                </button>
+                <a href="/resumes/versions/{{ v.id }}/download?format=pdf" class="btn-link">
+                  PDF
+                </a>
+                {% if v.file_type == 'docx' %}
+                <a href="/resumes/versions/{{ v.id }}/download?format=original" class="btn-link">
+                  DOCX
+                </a>
+                {% endif %}
+                <button
+                  type="button"
+                  class="btn-link-danger"
+                  hx-delete="/resumes/versions/{{ v.id }}"
+                  hx-confirm="Delete version v{{ v.version_number }} of '{{ resume.title }}'?"
+                  hx-target="#version-row-{{ v.id }}"
+                  hx-swap="outerHTML"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </details>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ======================================================================== -->
+  <!-- Dialog 1: Upload New Resume Modal                                         -->
+  <!-- ======================================================================== -->
+  <dialog id="upload-resume-dialog" class="modal-dialog">
+    <div
+      style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;"
+    >
+      <h3 style="margin: 0; font-size: 1.35rem;">Upload New Resume</h3>
+      <button
+        type="button"
+        class="modal-close-btn"
+        onclick="document.getElementById('upload-resume-dialog').close()"
+      >
+        &times;
+      </button>
+    </div>
+
+    <form method="post" action="/resumes" enctype="multipart/form-data">
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label
+          for="new-resume-person"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          Person / Candidate Name
+        </label>
+        <input
+          type="text"
+          id="new-resume-person"
+          name="person"
+          placeholder="e.g. Douglas Jaymes Caristo, Marissa Gaeta"
+          style="width: 100%; box-sizing: border-box;"
+        >
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          Substitutes the <code style="color: var(--accent-light);">{name}</code> token in
+          downloaded filenames and enables filtering by candidate.
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label
+          for="new-resume-title"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          Resume Profile Title <span style="color: #ef4444;">*</span>
+        </label>
+        <input
+          type="text"
+          id="new-resume-title"
+          name="title"
+          required
+          placeholder="e.g. Senior Full Stack Engineer, Data Science Resume"
+          style="width: 100%; box-sizing: border-box;"
+        >
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label
+          for="new-resume-tags"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          Tags / Role Keywords
+        </label>
+        <input
+          type="text"
+          id="new-resume-tags"
+          name="tags"
+          placeholder="e.g. Python, FastAPI, React, Remote, Backend"
+          style="width: 100%; box-sizing: border-box;"
+        >
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          Comma-separated keywords for filtering and smart job matching.
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label
+          for="new-resume-desc"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          Description / Target Focus
+        </label>
+        <textarea
+          id="new-resume-desc"
+          name="description"
+          rows="2"
+          placeholder="Optional notes regarding the target industry or career level for this resume..."
+          style="width: 100%; box-sizing: border-box;"
+        ></textarea>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label
+          for="new-resume-file"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          Upload File (.pdf or .docx) <span style="color: #ef4444;">*</span>
+        </label>
+        <input
+          type="file"
+          id="new-resume-file"
+          name="file"
+          accept=".pdf,.docx"
+          required
+          style="width: 100%; box-sizing: border-box; padding: 0.5rem; background: rgba(0, 0, 0, 0.2); border: 1px dashed var(--border-color); border-radius: 8px;"
+        >
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          Word documents are automatically compiled to high-fidelity PDFs upon upload.
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1.5rem;">
+        <label
+          for="new-resume-notes"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          Initial Version Notes
+        </label>
+        <input
+          type="text"
+          id="new-resume-notes"
+          name="change_notes"
+          value="Initial baseline version"
+          style="width: 100%; box-sizing: border-box;"
+        >
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+        <button
+          type="button"
+          class="btn-secondary"
+          onclick="document.getElementById('upload-resume-dialog').close()"
+        >
+          Cancel
+        </button>
+        <button type="submit" class="btn-primary">Upload & Create Profile</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ======================================================================== -->
+  <!-- Dialog 1B: Edit Resume Profile Modal                                     -->
+  <!-- ======================================================================== -->
+  <dialog id="edit-resume-dialog" class="modal-dialog">
+    <div
+      style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;"
+    >
+      <h3 style="margin: 0; font-size: 1.35rem;">Edit Resume Profile</h3>
+      <button
+        type="button"
+        class="modal-close-btn"
+        onclick="document.getElementById('edit-resume-dialog').close()"
+      >
+        &times;
+      </button>
+    </div>
+
+    <form id="edit-resume-form" method="post" action="">
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label
+          for="edit-resume-person"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          Person / Candidate Name
+        </label>
+        <input
+          type="text"
+          id="edit-resume-person"
+          name="person"
+          placeholder="e.g. Douglas Jaymes Caristo, Marissa Gaeta"
+          style="width: 100%; box-sizing: border-box;"
+        >
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          Substitutes the <code style="color: var(--accent-light);">{name}</code> token in
+          downloaded filenames and enables filtering by candidate.
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label
+          for="edit-resume-title"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          Resume Profile Title <span style="color: #ef4444;">*</span>
+        </label>
+        <input
+          type="text"
+          id="edit-resume-title"
+          name="title"
+          required
+          style="width: 100%; box-sizing: border-box;"
+        >
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label
+          for="edit-resume-tags"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          Tags / Role Keywords
+        </label>
+        <input
+          type="text"
+          id="edit-resume-tags"
+          name="tags"
+          style="width: 100%; box-sizing: border-box;"
+        >
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          Comma-separated keywords for filtering and smart job matching.
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1.5rem;">
+        <label
+          for="edit-resume-desc"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          Description / Target Focus
+        </label>
+        <textarea
+          id="edit-resume-desc"
+          name="description"
+          rows="2"
+          style="width: 100%; box-sizing: border-box;"
+        ></textarea>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+        <button
+          type="button"
+          class="btn-secondary"
+          onclick="document.getElementById('edit-resume-dialog').close()"
+        >
+          Cancel
+        </button>
+        <button type="submit" class="btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ======================================================================== -->
+  <!-- Dialog 2: Upload Subsequent Version Modal                                -->
+  <!-- ======================================================================== -->
+  <dialog id="upload-version-dialog" class="modal-dialog">
+    <div
+      style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;"
+    >
+      <h3 style="margin: 0; font-size: 1.35rem;" id="version-dialog-title">Upload New Version</h3>
+      <button
+        type="button"
+        class="modal-close-btn"
+        onclick="document.getElementById('upload-version-dialog').close()"
+      >
+        &times;
+      </button>
+    </div>
+
+    <form id="upload-version-form" method="post" action="" enctype="multipart/form-data">
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label for="version-file" style="display: block; font-weight: 600; margin-bottom: 0.35rem;">
+          Select File (.pdf or .docx) <span style="color: #ef4444;">*</span>
+        </label>
+        <input
+          type="file"
+          id="version-file"
+          name="file"
+          accept=".pdf,.docx"
+          required
+          style="width: 100%; box-sizing: border-box; padding: 0.5rem; background: rgba(0, 0, 0, 0.2); border: 1px dashed var(--border-color); border-radius: 8px;"
+        >
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1.5rem;">
+        <label
+          for="version-notes"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          Revision Notes / Changes Made <span style="color: #ef4444;">*</span>
+        </label>
+        <textarea
+          id="version-notes"
+          name="change_notes"
+          rows="3"
+          required
+          placeholder="e.g. Updated skills section with FastAPI experience; refined bullet points for leadership role..."
+          style="width: 100%; box-sizing: border-box;"
+        ></textarea>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+        <button
+          type="button"
+          class="btn-secondary"
+          onclick="document.getElementById('upload-version-dialog').close()"
+        >
+          Cancel
+        </button>
+        <button type="submit" class="btn-primary">Upload Revision</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ======================================================================== -->
+  <!-- Dialog 3: In-Browser PDF Preview Dialog                                  -->
+  <!-- ======================================================================== -->
+  <dialog id="preview-dialog" class="modal-dialog resume-viewer-dialog">
+    <div id="preview-dialog-content">
+      <div style="text-align: center; padding: 2rem;">
+        <div class="spinner" style="margin: 0 auto 1rem auto;"></div>
+        <p>Loading document viewer...</p>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ======================================================================== -->
+  <!-- Dialog 4: Custom Retrieval Download Modal                                -->
+  <!-- ======================================================================== -->
+  <dialog id="custom-download-dialog" class="modal-dialog">
+    <div
+      style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;"
+    >
+      <h3 style="margin: 0; font-size: 1.35rem;">Customize File Download</h3>
+      <button
+        type="button"
+        class="modal-close-btn"
+        onclick="document.getElementById('custom-download-dialog').close()"
+      >
+        &times;
+      </button>
+    </div>
+
+    <div>
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label
+          for="custom-download-format"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          Download Format
+        </label>
+        <select
+          id="custom-download-format"
+          onchange="updateDownloadFilenamePreview()"
+          style="width: 100%; box-sizing: border-box;"
+        >
+          <option value="pdf">Rendered PDF (.pdf)</option>
+          <option value="original" id="custom-download-original-option">
+            Original Word Document (.docx)
+          </option>
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1.25rem;">
+        <label
+          for="custom-download-filename"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          File Name for Download
+        </label>
+        <input
+          type="text"
+          id="custom-download-filename"
+          value=""
+          style="width: 100%; box-sizing: border-box;"
+        >
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.35rem;">
+          Pre-populated using your template pattern and today's date ({{ today.strftime('%m-%d-%Y')
+          }}).
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+        <button
+          type="button"
+          class="btn-secondary"
+          onclick="document.getElementById('custom-download-dialog').close()"
+        >
+          Cancel
+        </button>
+        <button type="button" class="btn-primary" onclick="executeCustomDownload()">
+          Download File
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ======================================================================== -->
+  <!-- Dialog 5: Retrieval Naming Settings Modal                                 -->
+  <!-- ======================================================================== -->
+  <dialog id="naming-settings-dialog" class="modal-dialog">
+    <div
+      style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;"
+    >
+      <h3 style="margin: 0; font-size: 1.35rem;">Retrieval Naming Preferences</h3>
+      <button
+        type="button"
+        class="modal-close-btn"
+        onclick="document.getElementById('naming-settings-dialog').close()"
+      >
+        &times;
+      </button>
+    </div>
+
+    <form method="post" action="/resumes/settings">
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label
+          for="pref-cand-name"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          Default Candidate / Person Name (Fallback)
+        </label>
+        <input
+          type="text"
+          id="pref-cand-name"
+          name="candidate_name"
+          value="{{ pref.candidate_name if pref else '' }}"
+          placeholder="e.g. Marissa G"
+          style="width: 100%; box-sizing: border-box;"
+        >
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          Substitutes the <code style="color: var(--accent-light);">{name}</code> token in
+          downloaded file names when a resume does not have a Person set.
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label
+          for="pref-naming-pattern"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          Naming Template Pattern
+        </label>
+        <input
+          type="text"
+          id="pref-naming-pattern"
+          name="resume_filename_pattern"
+          value="{{ pref.resume_filename_pattern if pref and pref.resume_filename_pattern else '{name} {date}.{ext}' }}"
+          required
+          style="width: 100%; box-sizing: border-box;"
+        >
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          Tokens: <code style="color: var(--accent-light);">{name}</code>,
+          <code style="color: var(--accent-light);">{date}</code>,
+          <code style="color: var(--accent-light);">{title}</code>,
+          <code style="color: var(--accent-light);">{version}</code>,
+          <code style="color: var(--accent-light);">{ext}</code>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1.5rem;">
+        <label
+          for="pref-date-format"
+          style="display: block; font-weight: 600; margin-bottom: 0.35rem;"
+        >
+          Date Format in Retrieval Filename
+        </label>
+        <select
+          id="pref-date-format"
+          name="resume_date_format"
+          style="width: 100%; box-sizing: border-box;"
+        >
+          {% set cur_df = pref.resume_date_format if pref and pref.resume_date_format else
+          '%m-%d-%Y' %} {% for df_val, df_label in [('%m-%d-%Y', 'MM-DD-YYYY (e.g. 09-10-2026)'),
+          ('%Y-%m-%d', 'YYYY-MM-DD (e.g. 2026-09-10)'), ('%B %d %Y', 'Month Day Year (e.g. September
+          10 2026)'), ('%b %Y', 'Mon Year (e.g. Sep 2026)')] %} {% if cur_df == df_val %}
+          <option value="{{ df_val }}" selected>{{ df_label }}</option>
+          {% else %}
+          <option value="{{ df_val }}">{{ df_label }}</option>
+          {% endif %} {% endfor %}
+        </select>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+        <button
+          type="button"
+          class="btn-secondary"
+          onclick="document.getElementById('naming-settings-dialog').close()"
+        >
+          Cancel
+        </button>
+        <button type="submit" class="btn-primary">Save Settings</button>
+      </div>
+    </form>
+  </dialog>
+</div>
+
+<script>
+let activeVersionId = null;
+let activeResumeTitle = "";
+let activeVersionNum = 1;
+let activeFileType = "pdf";
+let activePerson = "";
+
+window.openUploadVersionModal = (resumeId, title, nextVersion) => {
+  document.getElementById("upload-version-form").action = `/resumes/${resumeId}/versions`;
+  document.getElementById("version-dialog-title").innerText = `Upload ${title} (v${nextVersion})`;
+  document.getElementById("version-notes").value = "";
+  document.getElementById("upload-version-dialog").showModal();
+};
+
+window.openEditResumeModal = (resumeId, title, person, tags, desc) => {
+  document.getElementById("edit-resume-form").action = `/resumes/${resumeId}/edit`;
+  document.getElementById("edit-resume-person").value = person;
+  document.getElementById("edit-resume-title").value = title;
+  document.getElementById("edit-resume-tags").value = tags;
+  document.getElementById("edit-resume-desc").value = desc;
+  document.getElementById("edit-resume-dialog").showModal();
+};
+
+window.openCustomDownloadModal = (versionId, resumeTitle, versionNum, fileType, person) => {
+  activeVersionId = versionId;
+  activeResumeTitle = resumeTitle;
+  activeVersionNum = versionNum;
+  activeFileType = fileType.toLowerCase();
+  activePerson = person || "";
+
+  const origOption = document.getElementById("custom-download-original-option");
+  if (activeFileType === "docx") {
+    origOption.style.display = "block";
+    origOption.innerText = "Original Word Document (.docx)";
+  } else {
+    origOption.style.display = "none";
+    document.getElementById("custom-download-format").value = "pdf";
+  }
+
+  window.updateDownloadFilenamePreview();
+  document.getElementById("custom-download-dialog").showModal();
+};
+
+window.updateDownloadFilenamePreview = () => {
+  const format = document.getElementById("custom-download-format").value;
+  const ext = format === "pdf" ? "pdf" : activeFileType;
+  const candName =
+    activePerson || "{{ pref.candidate_name if pref and pref.candidate_name else '' }}";
+  const pattern =
+    "{{ pref.resume_filename_pattern if pref and pref.resume_filename_pattern else '{name} {date}.{ext}' }}";
+  const todayStr =
+    "{{ today.strftime(pref.resume_date_format if pref and pref.resume_date_format else '%m-%d-%Y') }}";
+
+  let filename = pattern
+    .replace("{name}", candName || activeResumeTitle || "Resume")
+    .replace("{title}", activeResumeTitle || "Resume")
+    .replace("{date}", todayStr)
+    .replace("{version}", `v${activeVersionNum}`)
+    .replace("{ext}", ext);
+
+  if (!filename.toLowerCase().endsWith(`.${ext}`)) {
+    filename = `${filename}.${ext}`;
+  }
+
+  document.getElementById("custom-download-filename").value = filename;
+};
+
+window.executeCustomDownload = () => {
+  if (!activeVersionId) return;
+  const format = document.getElementById("custom-download-format").value;
+  const filename = encodeURIComponent(document.getElementById("custom-download-filename").value);
+  const url = `/resumes/versions/${activeVersionId}/download?format=${format}&custom_filename=${filename}`;
+  window.location.href = url;
+  document.getElementById("custom-download-dialog").close();
+};
+</script>
+
+{% endblock %}
