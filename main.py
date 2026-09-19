@@ -1442,16 +1442,28 @@ async def get_application_detail(request: Request, id: int, db: Session = Depend
     )
 
 
+SAVE_BADGE_STYLE = (
+    "display: inline-flex; align-items: center; gap: 0.4rem; "
+    "background: rgba(16, 185, 129, 0.95); color: #ffffff; "
+    "border: 1px solid rgba(52, 211, 153, 0.6); "
+    "box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 14px rgba(16, 185, 129, 0.4); "
+    "backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); "
+    "font-size: 0.85rem; font-weight: 600; letter-spacing: 0.02em; "
+    "padding: 0.45rem 1rem; border-radius: 9999px; pointer-events: none;"
+)
+
+
 @app.post("/applications/{id}")
 async def update_application_detail(
     id: int,
+    request: Request,
     applied_date: str = Form(""),
     follow_up_date: str = Form(""),
     method: str = Form("Company Website"),
     account_created: bool = Form(False),
     portal_username: str = Form(""),
     confirmation_number: str = Form(""),
-    resume_version_id: int | None = Form(None),
+    resume_version_id: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     """Saves follow-up and compliance settings on the detail page."""
@@ -1479,10 +1491,21 @@ async def update_application_detail(
     app_record.account_created = account_created
     app_record.portal_username = portal_username.strip() or None
     app_record.confirmation_number = confirmation_number.strip() or None
-    app_record.resume_version_id = resume_version_id
+
+    if resume_version_id is not None:
+        clean_rv = resume_version_id.strip()
+        if clean_rv.isdigit():
+            app_record.resume_version_id = int(clean_rv)
+        elif clean_rv == "":
+            app_record.resume_version_id = None
 
     db.commit()
-    return RedirectResponse(url=f"/applications/{id}", status_code=303)
+
+    if request.headers.get("HX-Request"):
+        return HTMLResponse(
+            f'<div class="save-status-badge" style="{SAVE_BADGE_STYLE}">✓ Changes Saved</div>'
+        )
+    return RedirectResponse(url=f"/applications/{id}?saved=Changes+Saved", status_code=303)
 
 
 @app.post("/applications/{id}/job-info")
@@ -1516,7 +1539,32 @@ async def update_application_job_info(
             app_record.saved_job.salary_bracket = app_record.salary_stated
 
     db.commit()
-    return RedirectResponse(url=f"/applications/{id}", status_code=303)
+    return RedirectResponse(url=f"/applications/{id}?saved=Job+Info+Saved", status_code=303)
+
+
+@app.post("/applications/{id}/follow-up", response_class=HTMLResponse)
+async def update_application_follow_up(
+    id: int,
+    follow_up_date: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Updates follow-up reminder date without logging activity."""
+    app_record = db.query(JobApplication).filter(JobApplication.id == id).first()
+    if not app_record:
+        return HTMLResponse("Application not found.", status_code=404)
+
+    if follow_up_date:
+        try:
+            app_record.follow_up_date = datetime.date.fromisoformat(follow_up_date)
+        except ValueError:
+            pass
+    else:
+        app_record.follow_up_date = None
+
+    db.commit()
+    return HTMLResponse(
+        f'<div class="save-status-badge" style="{SAVE_BADGE_STYLE}">✓ Reminder Date Saved</div>'
+    )
 
 
 @app.post("/applications/{id}/description")
@@ -1532,7 +1580,7 @@ async def update_application_description(
 
     app_record.description = description.strip() or None
     db.commit()
-    return RedirectResponse(url=f"/applications/{id}", status_code=303)
+    return RedirectResponse(url=f"/applications/{id}?saved=Description+Saved", status_code=303)
 
 
 @app.post("/applications/{id}/delete")

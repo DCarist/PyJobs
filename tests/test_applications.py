@@ -617,3 +617,79 @@ def test_update_application_job_info(client: TestClient, db_session: Session):
     assert job.location == "Chesterbrook, PA, US (Hybrid)"
     assert job.salary_bracket == "$175k - $210k"
     assert job.job_url == "https://careers.amerisourcebergen.com/jobs/999"
+
+
+def test_update_application_follow_up_date(client: TestClient, db_session: Session):
+    app_record = JobApplication(
+        company="Regeneron",
+        title="Senior Validation Scientist",
+        status="applied",
+        applied_date=datetime.date(2026, 9, 10),
+        follow_up_date=None,
+    )
+    db_session.add(app_record)
+    db_session.commit()
+    db_session.refresh(app_record)
+
+    # 1. Update follow-up date (e.g. +2 weeks or change input)
+    resp = client.post(
+        f"/applications/{app_record.id}/follow-up",
+        data={"follow_up_date": "2026-09-24"},
+    )
+    assert resp.status_code == 200
+    assert "save-status-badge" in resp.text
+    assert "Reminder Date Saved" in resp.text
+
+    db_session.refresh(app_record)
+    assert app_record.follow_up_date == datetime.date(2026, 9, 24)
+    # Ensure no activity log was generated
+    assert len(app_record.activities) == 0
+
+    # 2. Clear follow-up date
+    resp_clear = client.post(
+        f"/applications/{app_record.id}/follow-up",
+        data={"follow_up_date": ""},
+    )
+    assert resp_clear.status_code == 200
+    assert "save-status-badge" in resp_clear.text
+    db_session.refresh(app_record)
+    assert app_record.follow_up_date is None
+    assert len(app_record.activities) == 0
+
+
+def test_update_application_compliance_htmx_save_badge(client: TestClient, db_session: Session):
+    app_record = JobApplication(
+        company="Moderna",
+        title="Principal Platform Engineer",
+        status="applied",
+        applied_date=datetime.date(2026, 9, 1),
+        method="Company Website",
+        account_created=False,
+    )
+    db_session.add(app_record)
+    db_session.commit()
+    db_session.refresh(app_record)
+
+    # HTMX request returns responsive save badge
+    resp = client.post(
+        f"/applications/{app_record.id}",
+        data={
+            "applied_date": "2026-09-12",
+            "method": "LinkedIn",
+            "account_created": "true",
+            "portal_username": "dev@moderna.com",
+            "confirmation_number": "REQ-7788",
+        },
+        headers={"HX-Request": "true"},
+    )
+    assert resp.status_code == 200
+    assert "save-status-badge" in resp.text
+    assert "Changes Saved" in resp.text
+
+    db_session.refresh(app_record)
+    assert app_record.applied_date == datetime.date(2026, 9, 12)
+    assert app_record.method == "LinkedIn"
+    assert app_record.account_created is True
+    assert app_record.portal_username == "dev@moderna.com"
+    assert app_record.confirmation_number == "REQ-7788"
+    assert len(app_record.activities) == 0

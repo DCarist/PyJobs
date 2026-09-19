@@ -10,7 +10,7 @@
       rel="stylesheet"
     >
     <!-- CSS -->
-    <link rel="stylesheet" href="/static/styles.css?v=2">
+    <link rel="stylesheet" href="/static/styles.css?v=3">
     <!-- HTMX -->
     <script
       src="https://unpkg.com/htmx.org@1.9.10"
@@ -19,6 +19,21 @@
     ></script>
   </head>
   <body>
+    <div
+      id="save-status-toast"
+      class="save-status-toast"
+      style="position: fixed; top: 1.25rem; right: 1.5rem; z-index: 999999; pointer-events: none; display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;"
+      aria-live="polite"
+    >
+      {% if request and request.query_params.get('saved') %}
+      <div
+        class="save-status-badge"
+        style="display: inline-flex; align-items: center; gap: 0.4rem; background: rgba(16, 185, 129, 0.95); color: #ffffff; border: 1px solid rgba(52, 211, 153, 0.6); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 14px rgba(16, 185, 129, 0.4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-size: 0.85rem; font-weight: 600; letter-spacing: 0.02em; padding: 0.45rem 1rem; border-radius: 9999px; pointer-events: none;"
+      >
+        ✓ {{ request.query_params.get('saved') }}
+      </div>
+      {% endif %}
+    </div>
     <div class="container">
       <header class="app-header">
         <div class="header-brand">

@@ -260,6 +260,14 @@ document.addEventListener("htmx:afterSwap", (evt) => {
   ) {
     window.initProfileFormState();
   }
+  const toast = document.getElementById("save-status-toast");
+  if (toast) {
+    toast.style.position = "fixed";
+    toast.style.top = "1.25rem";
+    toast.style.right = "1.5rem";
+    toast.style.zIndex = "999999";
+    toast.style.pointerEvents = "none";
+  }
 });
 
 document.addEventListener("click", (e) => {
@@ -276,3 +284,14 @@ document.addEventListener("click", (e) => {
     }
   }
 });
+
+// Clean up ?saved= from browser address bar after page load without triggering refresh
+if (window.location.search.includes("saved=")) {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("saved");
+  window.history.replaceState(
+    {},
+    document.title,
+    url.pathname + (url.search ? url.search : "") + url.hash,
+  );
+}

@@ -101,7 +101,19 @@
       <!-- Follow-up & Compliance Settings -->
       <div class="glass-panel detail-card">
         <h3 class="card-title">⏰ Follow-up & Compliance</h3>
-        <form method="post" action="/applications/{{ application.id }}">
+        <form
+          id="compliance-settings-form"
+          method="post"
+          action="/applications/{{ application.id }}"
+          hx-post="/applications/{{ application.id }}"
+          hx-target="#save-status-toast"
+          hx-swap="innerHTML"
+        >
+          <input
+            type="hidden"
+            name="resume_version_id"
+            value="{{ application.resume_version_id or '' }}"
+          >
           <div class="form-group">
             <label for="applied-date-input">Date Applied</label>
             <input
@@ -109,6 +121,11 @@
               id="applied-date-input"
               name="applied_date"
               value="{{ application.applied_date.strftime('%Y-%m-%d') if application.applied_date else '' }}"
+              hx-post="/applications/{{ application.id }}"
+              hx-trigger="change"
+              hx-include="#compliance-settings-form"
+              hx-target="#save-status-toast"
+              hx-swap="innerHTML"
             >
           </div>
 
@@ -121,9 +138,15 @@
                 onclick="
                   const d = new Date();
                   d.setDate(d.getDate() + 14);
-                  document.getElementById('follow-up-date-input').value = d.toISOString().split('T')[0];
+                  const inp = document.getElementById('follow-up-date-input');
+                  inp.value = d.toISOString().split('T')[0];
+                  if (window.htmx) {
+                    htmx.trigger(inp, 'change');
+                  } else {
+                    inp.dispatchEvent(new Event('change', { bubbles: true }));
+                  }
                 "
-                title="Quick set to 14 days from today"
+                title="Quick set to 14 days from today and auto-save"
               >
                 +2 Weeks
               </button>
@@ -134,12 +157,24 @@
               name="follow_up_date"
               value="{{ application.follow_up_date.strftime('%Y-%m-%d') if application.follow_up_date else '' }}"
               style="margin-top: 0.35rem;"
+              hx-post="/applications/{{ application.id }}/follow-up"
+              hx-trigger="change"
+              hx-target="#save-status-toast"
+              hx-swap="innerHTML"
             >
           </div>
 
           <div class="form-group" style="margin-top: 0.85rem;">
             <label for="method-input">Application Method</label>
-            <select id="method-input" name="method">
+            <select
+              id="method-input"
+              name="method"
+              hx-post="/applications/{{ application.id }}"
+              hx-trigger="change"
+              hx-include="#compliance-settings-form"
+              hx-target="#save-status-toast"
+              hx-swap="innerHTML"
+            >
               {% for m in ['Company Website', 'LinkedIn', 'Indeed', 'Google Jobs', 'Referral',
               'Recruiter', 'Email', 'Other'] %} {% if application.method == m %}
               <option value="{{ m }}" selected>{{ m }}</option>
@@ -163,9 +198,24 @@
                 name="account_created"
                 value="true"
                 checked
+                hx-post="/applications/{{ application.id }}"
+                hx-trigger="change"
+                hx-include="#compliance-settings-form"
+                hx-target="#save-status-toast"
+                hx-swap="innerHTML"
               >
               {% else %}
-              <input type="checkbox" id="account-created-check" name="account_created" value="true">
+              <input
+                type="checkbox"
+                id="account-created-check"
+                name="account_created"
+                value="true"
+                hx-post="/applications/{{ application.id }}"
+                hx-trigger="change"
+                hx-include="#compliance-settings-form"
+                hx-target="#save-status-toast"
+                hx-swap="innerHTML"
+              >
               {% endif %}
               <span style="font-weight: 500;">Applicant Portal Account Created</span>
             </label>
@@ -180,6 +230,11 @@
                 name="portal_username"
                 value="{{ application.portal_username or '' }}"
                 placeholder="e.g. yourname@gmail.com"
+                hx-post="/applications/{{ application.id }}"
+                hx-trigger="change"
+                hx-include="#compliance-settings-form"
+                hx-target="#save-status-toast"
+                hx-swap="innerHTML"
               >
             </div>
 
@@ -193,6 +248,11 @@
                 name="confirmation_number"
                 value="{{ application.confirmation_number or '' }}"
                 placeholder="e.g. REQ-10492"
+                hx-post="/applications/{{ application.id }}"
+                hx-trigger="change"
+                hx-include="#compliance-settings-form"
+                hx-target="#save-status-toast"
+                hx-swap="innerHTML"
               >
             </div>
           </div>
@@ -483,100 +543,100 @@
       </div>
     </div>
   </div>
+</div>
 
-  <!-- Edit Job Info Modal Dialog -->
-  <dialog id="edit-job-dialog" class="modal-dialog glass-panel" style="max-width: 580px;">
-    <div class="modal-header">
-      <h3 style="margin: 0; font-size: 1.25rem;">✏️ Edit Job Information</h3>
-      <button
-        type="button"
-        class="btn-icon"
-        onclick="document.getElementById('edit-job-dialog').close()"
-        title="Close modal"
-      >
-        ✕
-      </button>
+<!-- Edit Job Info Modal Dialog -->
+<dialog id="edit-job-dialog" class="modal-dialog glass-panel" style="max-width: 580px;">
+  <div class="modal-header">
+    <h3 style="margin: 0; font-size: 1.25rem;">✏️ Edit Job Information</h3>
+    <button
+      type="button"
+      class="btn-icon"
+      onclick="document.getElementById('edit-job-dialog').close()"
+      title="Close modal"
+    >
+      ✕
+    </button>
+  </div>
+
+  <form
+    method="post"
+    action="/applications/{{ application.id }}/job-info"
+    class="modal-body"
+    style="margin-top: 1rem;"
+  >
+    <div class="form-grid-2">
+      <div class="form-group">
+        <label for="edit-job-company">Company Name *</label>
+        <input
+          type="text"
+          id="edit-job-company"
+          name="company"
+          required
+          value="{{ '' if application.company == 'None' else application.company }}"
+          placeholder="e.g. Acme Health"
+        >
+      </div>
+      <div class="form-group">
+        <label for="edit-job-title">Job Title *</label>
+        <input
+          type="text"
+          id="edit-job-title"
+          name="title"
+          required
+          value="{{ application.title or '' }}"
+          placeholder="e.g. Senior Software Engineer"
+        >
+      </div>
     </div>
 
-    <form
-      method="post"
-      action="/applications/{{ application.id }}/job-info"
-      class="modal-body"
-      style="margin-top: 1rem;"
-    >
-      <div class="form-grid-2">
-        <div class="form-group">
-          <label for="edit-job-company">Company Name *</label>
-          <input
-            type="text"
-            id="edit-job-company"
-            name="company"
-            required
-            value="{{ '' if application.company == 'None' else application.company }}"
-            placeholder="e.g. Acme Health"
-          >
-        </div>
-        <div class="form-group">
-          <label for="edit-job-title">Job Title *</label>
-          <input
-            type="text"
-            id="edit-job-title"
-            name="title"
-            required
-            value="{{ application.title or '' }}"
-            placeholder="e.g. Senior Software Engineer"
-          >
-        </div>
-      </div>
-
-      <div class="form-grid-2" style="margin-top: 0.75rem;">
-        <div class="form-group">
-          <label for="edit-job-location">Location</label>
-          <input
-            type="text"
-            id="edit-job-location"
-            name="location"
-            value="{{ application.location or '' }}"
-            placeholder="e.g. Chesterbrook, PA, US"
-          >
-        </div>
-        <div class="form-group">
-          <label for="edit-job-salary">Salary Range / Bracket</label>
-          <input
-            type="text"
-            id="edit-job-salary"
-            name="salary_stated"
-            value="{{ application.salary_stated or '' }}"
-            placeholder="e.g. $160k - $200k"
-          >
-        </div>
-      </div>
-
-      <div class="form-group" style="margin-top: 0.75rem;">
-        <label for="edit-job-url">Job Posting URL</label>
+    <div class="form-grid-2" style="margin-top: 0.75rem;">
+      <div class="form-group">
+        <label for="edit-job-location">Location</label>
         <input
-          type="url"
-          id="edit-job-url"
-          name="job_url"
-          value="{{ application.job_url or '' }}"
-          placeholder="https://..."
+          type="text"
+          id="edit-job-location"
+          name="location"
+          value="{{ application.location or '' }}"
+          placeholder="e.g. Chesterbrook, PA, US"
         >
       </div>
+      <div class="form-group">
+        <label for="edit-job-salary">Salary Range / Bracket</label>
+        <input
+          type="text"
+          id="edit-job-salary"
+          name="salary_stated"
+          value="{{ application.salary_stated or '' }}"
+          placeholder="e.g. $160k - $200k"
+        >
+      </div>
+    </div>
 
-      <div
-        class="modal-footer"
-        style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;"
+    <div class="form-group" style="margin-top: 0.75rem;">
+      <label for="edit-job-url">Job Posting URL</label>
+      <input
+        type="url"
+        id="edit-job-url"
+        name="job_url"
+        value="{{ application.job_url or '' }}"
+        placeholder="https://..."
       >
-        <button
-          type="button"
-          class="btn-secondary"
-          onclick="document.getElementById('edit-job-dialog').close()"
-        >
-          Cancel
-        </button>
-        <button type="submit" class="btn-primary">Save Changes</button>
-      </div>
-    </form>
-  </dialog>
-</div>
+    </div>
+
+    <div
+      class="modal-footer"
+      style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;"
+    >
+      <button
+        type="button"
+        class="btn-secondary"
+        onclick="document.getElementById('edit-job-dialog').close()"
+      >
+        Cancel
+      </button>
+      <button type="submit" class="btn-primary">Save Changes</button>
+    </div>
+  </form>
+</dialog>
 {% endblock %}
