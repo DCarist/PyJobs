@@ -149,6 +149,7 @@ def query_filtered_jobs(
     show_hidden: bool = False,
     profile_id: str | int = "all",
     staleness: str = "all",
+    exclude_tracked: bool = False,
 ) -> list[SavedJob]:
     """Queries saved jobs applying active text, seniority, salary, site, and profile filters."""
     query = db.query(SavedJob)
@@ -157,6 +158,20 @@ def query_filtered_jobs(
         query = query.filter(SavedJob.is_hidden.is_(False))
     else:
         query = query.filter(SavedJob.is_hidden.is_(True))
+
+    if exclude_tracked:
+        tracked_urls = db.query(JobApplication.job_url).filter(
+            JobApplication.job_url.isnot(None),
+            JobApplication.job_url != "",
+        )
+        query = query.filter(
+            ~SavedJob.applications.any(),
+            or_(
+                SavedJob.job_url.is_(None),
+                SavedJob.job_url == "",
+                ~SavedJob.job_url.in_(tracked_urls),
+            ),
+        )
 
     if profile_id and str(profile_id) != "all":
         try:
@@ -267,7 +282,17 @@ def group_jobs(jobs: list[SavedJob], group_by: str) -> dict[str, list[SavedJob]]
 
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request, db: Session = Depends(get_db)):
+async def index(
+    request: Request,
+    exclude_tracked: bool | None = None,
+    db: Session = Depends(get_db),
+):
+    if exclude_tracked is None:
+        cookie_val = request.cookies.get("pyjobs_exclude_tracked")
+        is_exclude_tracked = (cookie_val or "").lower() in ("true", "1")
+    else:
+        is_exclude_tracked = exclude_tracked
+
     profiles = db.query(SearchProfile).order_by(SearchProfile.id.asc()).all()
     if not profiles:
         pref = db.query(UserPreference).first()
@@ -290,15 +315,10 @@ async def index(request: Request, db: Session = Depends(get_db)):
 
     active_profile = profiles[0]
 
-    # Immediately load existing saved jobs on launch so the user is in curation mode
-    jobs = (
-        db.query(SavedJob)
-        .filter(SavedJob.is_hidden.is_(False))
-        .order_by(SavedJob.date_posted.desc().nullslast(), SavedJob.id.desc())
-        .all()
-    )
+    # Immediately load existing saved jobs on launch applying active filters
+    jobs = query_filtered_jobs(db, exclude_tracked=is_exclude_tracked)
     tracked_map = get_tracked_applications_map(db)
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request=request,
         name="index.html",
         context={
@@ -309,8 +329,17 @@ async def index(request: Request, db: Session = Depends(get_db)):
             "group_by": "none",
             "active_page": "curation",
             "tracked_map": tracked_map,
+            "exclude_tracked": is_exclude_tracked,
         },
     )
+    response.set_cookie(
+        key="pyjobs_exclude_tracked",
+        value="true" if is_exclude_tracked else "false",
+        max_age=31536000,
+        samesite="lax",
+        path="/",
+    )
+    return response
 
 
 @app.get("/jobs/filter", response_class=HTMLResponse)
@@ -327,6 +356,7 @@ async def filter_jobs(
     group_by: str = "none",
     profile_id: str = "all",
     staleness: str = "all",
+    exclude_tracked: bool = False,
     db: Session = Depends(get_db),
 ):
     jobs = query_filtered_jobs(
@@ -341,10 +371,11 @@ async def filter_jobs(
         show_hidden=show_hidden,
         profile_id=profile_id,
         staleness=staleness,
+        exclude_tracked=exclude_tracked,
     )
     grouped = group_jobs(jobs, group_by=group_by)
     tracked_map = get_tracked_applications_map(db)
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request=request,
         name="partials/job_results.html",
         context={
@@ -353,12 +384,22 @@ async def filter_jobs(
             "group_by": group_by,
             "show_hidden": show_hidden,
             "tracked_map": tracked_map,
+            "exclude_tracked": exclude_tracked,
         },
     )
+    response.set_cookie(
+        key="pyjobs_exclude_tracked",
+        value="true" if exclude_tracked else "false",
+        max_age=31536000,
+        samesite="lax",
+        path="/",
+    )
+    return response
 
 
 @app.get("/jobs/export")
 async def export_jobs(
+    request: Request,
     format: str = "csv",
     q: str = "",
     sort: str = "newest",
@@ -370,8 +411,15 @@ async def export_jobs(
     show_hidden: bool = False,
     profile_id: str = "all",
     staleness: str = "all",
+    exclude_tracked: bool | None = None,
     db: Session = Depends(get_db),
 ):
+    if exclude_tracked is None:
+        cookie_val = request.cookies.get("pyjobs_exclude_tracked")
+        is_exclude_tracked = (cookie_val or "").lower() in ("true", "1")
+    else:
+        is_exclude_tracked = exclude_tracked
+
     jobs = query_filtered_jobs(
         db=db,
         q=q,
@@ -384,6 +432,7 @@ async def export_jobs(
         show_hidden=show_hidden,
         profile_id=profile_id,
         staleness=staleness,
+        exclude_tracked=is_exclude_tracked,
     )
 
     data = [

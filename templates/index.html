@@ -193,6 +193,25 @@
               <span>View hidden postings</span>
             </label>
 
+            <label
+              class="checkbox-label"
+              for="exclude_tracked"
+              title="Hide postings you have already saved or applied to"
+            >
+              {% if exclude_tracked %}
+              <input
+                type="checkbox"
+                id="exclude_tracked"
+                name="exclude_tracked"
+                value="true"
+                checked
+              >
+              {% else %}
+              <input type="checkbox" id="exclude_tracked" name="exclude_tracked" value="true">
+              {% endif %}
+              <span>Hide tracked jobs</span>
+            </label>
+
             <!-- Staleness Actions -->
             <button
               type="button"

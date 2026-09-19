@@ -248,8 +248,44 @@ window.saveAndScrapeProfile = (profileId) => {
     });
 };
 
+// Sync and persist exclude_tracked checkbox state across navigation
+function initTrackedFilterPersistence() {
+  const checkbox = document.getElementById("exclude_tracked");
+  const form = document.getElementById("curation-form");
+  if (!checkbox) return;
+
+  try {
+    const saved = localStorage.getItem("pyjobs_exclude_tracked");
+    if (saved !== null) {
+      const shouldBeChecked = saved === "true";
+      if (checkbox.checked !== shouldBeChecked) {
+        checkbox.checked = shouldBeChecked;
+        checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    }
+  } catch (_) {}
+
+  checkbox.addEventListener("change", () => {
+    const val = checkbox.checked ? "true" : "false";
+    try {
+      localStorage.setItem("pyjobs_exclude_tracked", val);
+    } catch (_) {}
+  });
+
+  if (form) {
+    form.addEventListener("reset", () => {
+      setTimeout(() => {
+        try {
+          localStorage.setItem("pyjobs_exclude_tracked", "false");
+        } catch (_) {}
+      }, 0);
+    });
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   window.initProfileFormState();
+  initTrackedFilterPersistence();
 });
 
 document.addEventListener("htmx:afterSwap", (evt) => {
