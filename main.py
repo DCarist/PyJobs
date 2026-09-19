@@ -1485,6 +1485,40 @@ async def update_application_detail(
     return RedirectResponse(url=f"/applications/{id}", status_code=303)
 
 
+@app.post("/applications/{id}/job-info")
+async def update_application_job_info(
+    id: int,
+    company: str = Form(...),
+    title: str = Form(...),
+    location: str = Form(""),
+    salary_stated: str = Form(""),
+    job_url: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Updates core job posting information (company, title, location, salary, job_url)."""
+    app_record = db.query(JobApplication).filter(JobApplication.id == id).first()
+    if not app_record:
+        return HTMLResponse("Application not found.", status_code=404)
+
+    app_record.company = company.strip()
+    app_record.title = title.strip()
+    app_record.location = location.strip()
+    app_record.salary_stated = salary_stated.strip() or None
+    app_record.job_url = job_url.strip() or None
+
+    if app_record.saved_job:
+        app_record.saved_job.company = app_record.company
+        app_record.saved_job.title = app_record.title
+        app_record.saved_job.location = app_record.location
+        if app_record.job_url:
+            app_record.saved_job.job_url = app_record.job_url
+        if app_record.salary_stated:
+            app_record.saved_job.salary_bracket = app_record.salary_stated
+
+    db.commit()
+    return RedirectResponse(url=f"/applications/{id}", status_code=303)
+
+
 @app.post("/applications/{id}/description")
 async def update_application_description(
     id: int,

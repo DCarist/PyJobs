@@ -551,3 +551,69 @@ def test_seed_script_populates_pipeline_and_contacts(db_session: Session):
         # Verify idempotency on second run
         seed()
         assert db_session.query(JobApplication).count() == 3
+
+
+def test_update_application_job_info(client: TestClient, db_session: Session):
+    # Setup a saved job and application with incomplete or "None" company
+    job = SavedJob(
+        job_id="test-job-edit-info",
+        title="Sr. Manager, Quality Systems and Compliance Technology",
+        company="None",
+        location="Chesterbrook, PA, US",
+        job_url="https://indeed.com/viewjob?jk=12345",
+    )
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    app_record = JobApplication(
+        saved_job_id=job.id,
+        title=job.title,
+        company=job.company,
+        location=job.location,
+        job_url=job.job_url,
+        status="applied",
+    )
+    db_session.add(app_record)
+    db_session.commit()
+    db_session.refresh(app_record)
+
+    # Verify initial detail page shows Edit Job Info button and modal
+    detail_resp = client.get(f"/applications/{app_record.id}")
+    assert detail_resp.status_code == 200
+    assert "Edit Job Info" in detail_resp.text
+    assert "edit-job-dialog" in detail_resp.text
+
+    # Post updated job info (fix company name, refine title, salary, url)
+    post_resp = client.post(
+        f"/applications/{app_record.id}/job-info",
+        data={
+            "company": "AmerisourceBergen",
+            "title": "Director, Quality Systems & Compliance",
+            "location": "Chesterbrook, PA, US (Hybrid)",
+            "salary_stated": "$175k - $210k",
+            "job_url": "https://careers.amerisourcebergen.com/jobs/999",
+        },
+        follow_redirects=True,
+    )
+    assert post_resp.status_code == 200
+    assert "AmerisourceBergen" in post_resp.text
+    assert "Director, Quality Systems &amp; Compliance" in post_resp.text
+    assert "Chesterbrook, PA, US (Hybrid)" in post_resp.text
+    assert "$175k - $210k" in post_resp.text
+
+    # Verify DB state for application
+    db_session.refresh(app_record)
+    assert app_record.company == "AmerisourceBergen"
+    assert app_record.title == "Director, Quality Systems & Compliance"
+    assert app_record.location == "Chesterbrook, PA, US (Hybrid)"
+    assert app_record.salary_stated == "$175k - $210k"
+    assert app_record.job_url == "https://careers.amerisourcebergen.com/jobs/999"
+
+    # Verify underlying SavedJob was also synced
+    db_session.refresh(job)
+    assert job.company == "AmerisourceBergen"
+    assert job.title == "Director, Quality Systems & Compliance"
+    assert job.location == "Chesterbrook, PA, US (Hybrid)"
+    assert job.salary_bracket == "$175k - $210k"
+    assert job.job_url == "https://careers.amerisourcebergen.com/jobs/999"

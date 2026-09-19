@@ -133,6 +133,7 @@ set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
 * **Detailed Table View**: Filterable table with quick stage dropdowns, contact counters, follow-up dates, and direct management links.
 * **Follow-Up Reminders**: Visual indicators for `Due Today`, `Overdue`, and `Upcoming` follow-ups.
 * **Application Detail Command Center (`/applications/{id}`)**:
+  * **Job Info Editor**: Quick modal dialog to edit posting company, role title, location, salary range, and URL with automatic feed-job syncing.
   * **Key Contacts**: 1-to-many relationship tracking recruiters, hiring managers, and internal referrals with email, phone, and LinkedIn URLs.
   * **Activity Timeline**: Reverse-chronological audit log capturing status transitions, interview prep notes, and outreach.
   * **Job Description Snapshot**: Manually editable snapshot preserving the original posting text even if the live posting expires.

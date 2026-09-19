@@ -15,6 +15,14 @@
         <span>Open Original Posting ↗</span>
       </a>
       {% endif %}
+      <button
+        type="button"
+        class="btn-secondary btn-small"
+        onclick="document.getElementById('edit-job-dialog').showModal()"
+        title="Edit job title, company, location, salary, or link"
+      >
+        <span>✏️ Edit Job Info</span>
+      </button>
       <form
         method="post"
         action="/applications/{{ application.id }}/delete"
@@ -37,7 +45,17 @@
         <span class="badge salary-badge"> 💰 {{ application.salary_stated }} </span>
         {% endif %}
       </div>
-      <h2 class="detail-title">{{ application.title or "Untitled Position" }}</h2>
+      <div class="detail-title-row">
+        <h2 class="detail-title">{{ application.title or "Untitled Position" }}</h2>
+        <button
+          type="button"
+          class="btn-secondary btn-tiny btn-edit-job"
+          onclick="document.getElementById('edit-job-dialog').showModal()"
+          title="Edit Job Information"
+        >
+          ✏️ Edit Info
+        </button>
+      </div>
       <h3 class="detail-company">
         {{ application.company }} {% if application.location %}
         <span class="detail-location">· 📍 {{ application.location }}</span>
@@ -465,5 +483,100 @@
       </div>
     </div>
   </div>
+
+  <!-- Edit Job Info Modal Dialog -->
+  <dialog id="edit-job-dialog" class="modal-dialog glass-panel" style="max-width: 580px;">
+    <div class="modal-header">
+      <h3 style="margin: 0; font-size: 1.25rem;">✏️ Edit Job Information</h3>
+      <button
+        type="button"
+        class="btn-icon"
+        onclick="document.getElementById('edit-job-dialog').close()"
+        title="Close modal"
+      >
+        ✕
+      </button>
+    </div>
+
+    <form
+      method="post"
+      action="/applications/{{ application.id }}/job-info"
+      class="modal-body"
+      style="margin-top: 1rem;"
+    >
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label for="edit-job-company">Company Name *</label>
+          <input
+            type="text"
+            id="edit-job-company"
+            name="company"
+            required
+            value="{{ '' if application.company == 'None' else application.company }}"
+            placeholder="e.g. Acme Health"
+          >
+        </div>
+        <div class="form-group">
+          <label for="edit-job-title">Job Title *</label>
+          <input
+            type="text"
+            id="edit-job-title"
+            name="title"
+            required
+            value="{{ application.title or '' }}"
+            placeholder="e.g. Senior Software Engineer"
+          >
+        </div>
+      </div>
+
+      <div class="form-grid-2" style="margin-top: 0.75rem;">
+        <div class="form-group">
+          <label for="edit-job-location">Location</label>
+          <input
+            type="text"
+            id="edit-job-location"
+            name="location"
+            value="{{ application.location or '' }}"
+            placeholder="e.g. Chesterbrook, PA, US"
+          >
+        </div>
+        <div class="form-group">
+          <label for="edit-job-salary">Salary Range / Bracket</label>
+          <input
+            type="text"
+            id="edit-job-salary"
+            name="salary_stated"
+            value="{{ application.salary_stated or '' }}"
+            placeholder="e.g. $160k - $200k"
+          >
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top: 0.75rem;">
+        <label for="edit-job-url">Job Posting URL</label>
+        <input
+          type="url"
+          id="edit-job-url"
+          name="job_url"
+          value="{{ application.job_url or '' }}"
+          placeholder="https://..."
+        >
+      </div>
+
+      <div
+        class="modal-footer"
+        style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;"
+      >
+        <button
+          type="button"
+          class="btn-secondary"
+          onclick="document.getElementById('edit-job-dialog').close()"
+        >
+          Cancel
+        </button>
+        <button type="submit" class="btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </dialog>
 </div>
 {% endblock %}
