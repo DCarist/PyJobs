@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from models import SearchProfile
-from scheduler import _check_and_run_scheduled_profiles, _run_startup_profiles
+from pyjobs.models import SearchProfile
+from pyjobs.services.scheduler import _check_and_run_scheduled_profiles, _run_startup_profiles
 
 
 @pytest.mark.anyio
@@ -14,7 +16,9 @@ async def test_scheduler_startup_profiles(db_session):
     db_session.add_all([p1, p2])
     db_session.commit()
 
-    with patch("scheduler.launch_scrape_task", new_callable=AsyncMock) as mock_launch:
+    with patch(
+        "pyjobs.services.scheduler.launch_scrape_task", new_callable=AsyncMock
+    ) as mock_launch:
         await _run_startup_profiles(lambda: db_session)
         assert mock_launch.call_count == 1
         call_args = mock_launch.call_args[0]
@@ -44,7 +48,9 @@ async def test_scheduler_interval_profiles(db_session):
     db_session.add_all([p_due, p_recent, p_manual])
     db_session.commit()
 
-    with patch("scheduler.launch_scrape_task", new_callable=AsyncMock) as mock_launch:
+    with patch(
+        "pyjobs.services.scheduler.launch_scrape_task", new_callable=AsyncMock
+    ) as mock_launch:
         await _check_and_run_scheduled_profiles(lambda: db_session)
         assert mock_launch.call_count == 1
         call_args = mock_launch.call_args[0]

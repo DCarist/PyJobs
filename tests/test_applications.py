@@ -3,7 +3,7 @@ import datetime
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from models import ApplicationActivity, ApplicationContact, JobApplication, SavedJob
+from pyjobs.models import ApplicationActivity, ApplicationContact, JobApplication, SavedJob
 
 
 def test_track_job_from_feed(client: TestClient, db_session: Session):

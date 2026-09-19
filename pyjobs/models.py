@@ -5,7 +5,7 @@ import datetime
 from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from database import Base
+from pyjobs.database import Base
 
 
 class UserPreference(Base):

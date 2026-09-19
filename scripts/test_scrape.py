@@ -1,8 +1,11 @@
 import argparse
 import sys
 import time
+from pathlib import Path
 
-from scraper import fetch_jobs
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from pyjobs.services.scraper import fetch_jobs
 
 
 def main() -> None:

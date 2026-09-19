@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from models import SavedJob, UserPreference
+from pyjobs.models import SavedJob, UserPreference
 
 
 def test_index_page(client):
@@ -74,7 +74,7 @@ def test_search_jobs_with_mock(client, db_session):
         }
     ]
 
-    with patch("main.fetch_jobs", return_value=mock_jobs):
+    with patch("pyjobs.routers.discovery.fetch_jobs", return_value=mock_jobs):
         response = client.post("/search")
         assert response.status_code == 200
         assert "Senior Python Engineer" in response.text

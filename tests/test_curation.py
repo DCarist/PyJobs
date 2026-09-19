@@ -5,9 +5,9 @@ import json
 import openpyxl
 from sqlalchemy.orm import Session
 
-from database import sync_job_classifications
-from models import JobApplication, SavedJob
-from scraper import _parse_valid_float, categorize_salary, classify_seniority
+from pyjobs.database import sync_job_classifications
+from pyjobs.models import JobApplication, SavedJob
+from pyjobs.services.scraper import _parse_valid_float, categorize_salary, classify_seniority
 
 
 def test_classify_seniority():

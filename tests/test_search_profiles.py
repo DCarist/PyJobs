@@ -1,9 +1,9 @@
 import datetime
 from unittest.mock import patch
 
-from models import JobSearchProfile, SavedJob, SearchProfile
-from scraper import evaluate_job_staleness
-from task_manager import run_scrape_task_sync
+from pyjobs.models import JobSearchProfile, SavedJob, SearchProfile
+from pyjobs.services.scraper import evaluate_job_staleness
+from pyjobs.services.task_manager import run_scrape_task_sync
 
 
 def test_create_and_update_search_profile(client, db_session):
@@ -110,7 +110,7 @@ def test_async_scrape_flow_and_metrics(client, db_session):
         }
     ]
 
-    with patch("task_manager.fetch_jobs", return_value=mock_jobs):
+    with patch("pyjobs.services.task_manager.fetch_jobs", return_value=mock_jobs):
         # Trigger async scrape start
         response = client.post(f"/scrape/start?profile_id={profile.id}")
         assert response.status_code == 200

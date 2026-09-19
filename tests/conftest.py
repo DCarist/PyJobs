@@ -8,8 +8,9 @@ from sqlalchemy.pool import StaticPool
 
 os.environ["PYJOBS_TESTING"] = "1"
 
-from database import Base
-from main import app, get_db
+from pyjobs.database import Base
+from pyjobs.dependencies import get_db
+from pyjobs.main import app
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 

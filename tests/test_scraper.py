@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from scraper import fetch_jobs, parse_locations
+from pyjobs.services.scraper import fetch_jobs, parse_locations
 
 
 def test_parse_locations_single():
@@ -120,7 +120,7 @@ def test_fetch_jobs_multi_location_and_deduplication():
             return df_philly
         return df_ny
 
-    with patch("scraper.scrape_jobs", side_effect=mock_scrape):
+    with patch("pyjobs.services.scraper.scrape_jobs", side_effect=mock_scrape):
         results = fetch_jobs(
             search_term="QA",
             location="Philadelphia, PA, New York, NY",
@@ -138,7 +138,9 @@ def test_fetch_jobs_multi_location_and_deduplication():
 
 
 def test_fetch_jobs_handles_scraper_exception():
-    with patch("scraper.scrape_jobs", side_effect=RuntimeError("Cloudflare blocked")):
+    with patch(
+        "pyjobs.services.scraper.scrape_jobs", side_effect=RuntimeError("Cloudflare blocked")
+    ):
         results = fetch_jobs(
             search_term="QA",
             location="Philadelphia, PA",

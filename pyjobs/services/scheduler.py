@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import datetime
 import logging
@@ -5,8 +7,8 @@ from collections.abc import Callable
 
 from sqlalchemy.orm import Session
 
-from models import SearchProfile
-from task_manager import TASKS, launch_scrape_task
+from pyjobs.models import SearchProfile
+from pyjobs.services.task_manager import TASKS, launch_scrape_task
 
 logger = logging.getLogger("pyjobs.scheduler")
 
