@@ -293,9 +293,72 @@ function initTrackedFilterPersistence() {
   }
 }
 
+// ==============================================================================
+// Manual External Application Modal - Status & Date Logic
+// ==============================================================================
+window.handleManualAppStatusChange = (status) => {
+  const appliedDateInput = document.getElementById("manual-applied-date");
+  const followUpDateInput = document.getElementById("manual-follow-up-date");
+  if (!appliedDateInput || !followUpDateInput) return;
+
+  const formatDate = (d) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const now = new Date();
+  if (status === "applied") {
+    appliedDateInput.value = formatDate(now);
+    appliedDateInput.dispatchEvent(new Event("input", { bubbles: true }));
+    appliedDateInput.dispatchEvent(new Event("change", { bubbles: true }));
+
+    const twoWeeksLater = new Date(now);
+    twoWeeksLater.setDate(twoWeeksLater.getDate() + 14);
+    followUpDateInput.value = formatDate(twoWeeksLater);
+    followUpDateInput.dispatchEvent(new Event("input", { bubbles: true }));
+    followUpDateInput.dispatchEvent(new Event("change", { bubbles: true }));
+  } else if (status === "saved") {
+    appliedDateInput.value = "";
+    appliedDateInput.dispatchEvent(new Event("input", { bubbles: true }));
+    appliedDateInput.dispatchEvent(new Event("change", { bubbles: true }));
+
+    const oneWeekLater = new Date(now);
+    oneWeekLater.setDate(oneWeekLater.getDate() + 7);
+    followUpDateInput.value = formatDate(oneWeekLater);
+    followUpDateInput.dispatchEvent(new Event("input", { bubbles: true }));
+    followUpDateInput.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+};
+
+window.openManualAppModal = () => {
+  const modal = document.getElementById("manual-app-modal");
+  if (!modal) return;
+  const form = modal.querySelector("form");
+  if (form) form.reset();
+  const statusSelect = document.getElementById("manual-status");
+  if (statusSelect) {
+    statusSelect.value = "applied";
+    window.handleManualAppStatusChange("applied");
+  }
+  modal.showModal();
+};
+
+window.initManualAppModal = () => {
+  const statusSelect = document.getElementById("manual-status");
+  if (statusSelect && !statusSelect.dataset.statusListenerAttached) {
+    statusSelect.dataset.statusListenerAttached = "true";
+    statusSelect.addEventListener("change", (e) => {
+      window.handleManualAppStatusChange(e.target.value);
+    });
+  }
+};
+
 document.addEventListener("DOMContentLoaded", () => {
   window.initProfileFormState();
   initTrackedFilterPersistence();
+  window.initManualAppModal();
 });
 
 document.addEventListener("htmx:afterSwap", (evt) => {
@@ -306,6 +369,7 @@ document.addEventListener("htmx:afterSwap", (evt) => {
   ) {
     window.initProfileFormState();
   }
+  window.initManualAppModal();
   const toast = document.getElementById("save-status-toast");
   if (toast) {
     toast.style.position = "fixed";

@@ -14,7 +14,7 @@
       <button
         type="button"
         class="btn-primary btn-log-external"
-        onclick="document.getElementById('manual-app-modal').showModal()"
+        onclick="window.openManualAppModal ? window.openManualAppModal() : document.getElementById('manual-app-modal').showModal()"
         title="Log a job applied to on external company sites or job boards"
       >
         <span>+ Log External Application</span>
@@ -192,7 +192,11 @@
       </div>
       <div class="form-group">
         <label for="manual-status">Current Status</label>
-        <select id="manual-status" name="status">
+        <select
+          id="manual-status"
+          name="status"
+          onchange="window.handleManualAppStatusChange(this.value)"
+        >
           <option value="applied" selected>Applied</option>
           <option value="saved">Saved / Planning to Apply</option>
           <option value="screening">Phone Screen</option>
@@ -258,9 +262,7 @@
           >
         </div>
         <div class="form-group">
-          <label for="manual-confirmation" style="font-size: 0.8rem;"
-            >Confirmation / App # (For Unemployment)</label
-          >
+          <label for="manual-confirmation" style="font-size: 0.8rem;">Confirmation / App #</label>
           <input
             type="text"
             id="manual-confirmation"
@@ -299,18 +301,22 @@
       ></textarea>
     </div>
 
-    <div
-      class="modal-footer"
-      style="margin-top: 1.25rem; display: flex; justify-content: flex-end; gap: 0.75rem;"
-    >
+    <div class="modal-footer" style="margin-top: 1.25rem; display: flex; gap: 0.75rem;">
       <button
         type="button"
         class="btn-secondary"
         onclick="document.getElementById('manual-app-modal').close()"
+        style="flex: 1 1 0; min-width: 0; justify-content: center; text-align: center;"
       >
         Cancel
       </button>
-      <button type="submit" class="btn-primary" style="width: auto;">Save Application</button>
+      <button
+        type="submit"
+        class="btn-primary"
+        style="flex: 1 1 0; min-width: 0; justify-content: center; text-align: center;"
+      >
+        Save Application
+      </button>
     </div>
   </form>
 </dialog>

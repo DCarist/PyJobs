@@ -176,7 +176,7 @@ async def create_manual_application(
         try:
             parsed_applied_date = datetime.date.fromisoformat(applied_date)
         except ValueError:
-            parsed_applied_date = today
+            parsed_applied_date = today if status == "applied" else None
 
     parsed_follow_up_date = None
     if follow_up_date:
@@ -185,9 +185,12 @@ async def create_manual_application(
         except ValueError:
             parsed_follow_up_date = None
 
-    if not parsed_follow_up_date and status == "applied":
-        base_date = parsed_applied_date or today
-        parsed_follow_up_date = base_date + datetime.timedelta(days=14)
+    if not parsed_follow_up_date:
+        if status == "applied":
+            base_date = parsed_applied_date or today
+            parsed_follow_up_date = base_date + datetime.timedelta(days=14)
+        elif status == "saved":
+            parsed_follow_up_date = today + datetime.timedelta(days=7)
 
     app_record = JobApplication(
         company=company.strip(),
