@@ -185,6 +185,18 @@
         <option value="24" selected>Daily (Every 24h)</option>
         {% else %}
         <option value="24">Daily (Every 24h)</option>
+        {% endif %} {% if intv == 72 %}
+        <option value="72" selected>Every 3 Days (72h)</option>
+        {% else %}
+        <option value="72">Every 3 Days (72h)</option>
+        {% endif %} {% if intv == 120 %}
+        <option value="120" selected>Every 5 Days (120h)</option>
+        {% else %}
+        <option value="120">Every 5 Days (120h)</option>
+        {% endif %} {% if intv == 168 %}
+        <option value="168" selected>Every 7 Days (Weekly)</option>
+        {% else %}
+        <option value="168">Every 7 Days (Weekly)</option>
         {% endif %}
       </select>
 
@@ -270,7 +282,11 @@
       {% endif %}
 
       <div style="display: flex; gap: 0.5rem;">
-        <button type="submit" class="btn-secondary" style="flex: 1; justify-content: center;">
+        <button
+          type="submit"
+          class="btn-secondary"
+          style="flex: 1 1 0; min-width: 0; justify-content: center; text-align: center; white-space: nowrap;"
+        >
           {{ "Create Profile" if is_new else "Save Profile" }}
         </button>
 
@@ -281,7 +297,7 @@
           hx-delete="/profiles/{{ active_profile.id }}"
           hx-target="#profile-sidebar-container"
           hx-confirm="Are you sure you want to delete profile '{{ active_profile.name }}'?"
-          style="color: var(--danger); border-color: rgba(239, 68, 68, 0.4);"
+          style="flex: 1 1 0; min-width: 0; justify-content: center; text-align: center; white-space: nowrap; color: var(--danger); border-color: rgba(239, 68, 68, 0.4);"
           title="Delete profile"
         >
           Delete
@@ -289,13 +305,17 @@
         {% endif %}
       </div>
     </div>
-
-    {% if message %}
-    <div class="success-msg" style="margin-top: 1rem;">{{ message }}</div>
-    {% endif %}
   </form>
 
-  {% if not is_new and active_profile %}
+  {% if message %}
+  <div id="save-status-toast" hx-swap-oob="true" class="save-status-toast" aria-live="polite">
+    <div class="save-status-badge">✓ {{ message }}</div>
+  </div>
+  {% elif error %}
+  <div id="save-status-toast" hx-swap-oob="true" class="save-status-toast" aria-live="polite">
+    <div class="save-status-badge error">⚠ {{ error }}</div>
+  </div>
+  {% endif %} {% if not is_new and active_profile %}
   <!-- Unsaved Changes Confirmation Modal -->
   <dialog
     id="unsaved-profile-modal"

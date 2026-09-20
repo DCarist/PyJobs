@@ -29,8 +29,14 @@ Guidelines and constraints for all backend code in PyJobs.
 
 ---
 
-## 3. FastAPI & Routing
-* Route handlers should be grouped logically into routers (`api_router`, `views_router`, etc.).
+## 3. FastAPI & Package Architecture
+* All application logic is packaged under `pyjobs/`:
+  * `pyjobs.main`: Thin FastAPI orchestrator, lifespan management, static mounting, and router registration.
+  * `pyjobs.routers`: Route controllers (`discovery`, `jobs`, `profiles`, `applications`, `resumes`).
+  * `pyjobs.services`: Background engines and parsers (`scraper`, `scheduler`, `task_manager`, `resume_parser`).
+  * `pyjobs.dependencies`: Dependency injection (`get_db`, `templates`), path resolvers, and query helpers.
+  * `pyjobs.database` & `pyjobs.models`: SQLAlchemy 2.0 ORM engine, declarative models, and schema migrations.
+  * `pyjobs.launcher`: Network-enabled server launcher wrapped by the root `run.py` shim.
 * Validate all request inputs using Pydantic schemas or standard FastAPI parameters.
 * Return appropriate HTTP status codes (e.g. `201 Created`, `404 Not Found`, `422 Unprocessable Entity`).
 * Ensure background tasks and scraping operations do not block the event loop (run in worker threads via `asyncio.to_thread`).
@@ -54,7 +60,7 @@ Guidelines and constraints for all backend code in PyJobs.
 ---
 
 ## 6. Document Processing & Ingestion
-* **Text Extraction**: Use `resume_parser.extract_text` via PyMuPDF (`fitz`) for PDF and `python-docx` for Word documents.
+* **Text Extraction**: Use `pyjobs.services.resume_parser.extract_text` via PyMuPDF (`fitz`) for PDF and `python-docx` for Word documents.
 * **Automatic PDF Compilation**: All uploaded `.docx` files must be compiled to `.pdf` via `convert_docx_to_pdf` to ensure in-browser PDF viewer compatibility.
 * **Hermetic Testing**: Under `PYJOBS_TESTING=1`, document conversion must use `convert_docx_to_pdf_pure_pymupdf` to avoid unmanaged Word COM processes and maintain sub-second test execution.
 * **Filename Templating**: Use `generate_download_filename` to resolve dynamic tokens (`{name}`, `{date}`, `{title}`, `{company}`, `{job_title}`, `{version}`) and sanitize OS-illegal characters across platforms.

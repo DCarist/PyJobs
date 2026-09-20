@@ -10,8 +10,8 @@ import pymupdf
 import pytest
 from sqlalchemy.orm import Session
 
-from models import JobApplication, Resume, UserPreference
-from resume_parser import (
+from pyjobs.models import JobApplication, Resume, UserPreference
+from pyjobs.services.resume_parser import (
     extract_text_from_docx,
     extract_text_from_pdf,
     generate_download_filename,

@@ -1,6 +1,6 @@
 [project]
 name = "pyjobs"
-version = "0.1.0"
+version = "0.2.0"
 description = "Intelligent Job Curation & Application Tracker"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.scripts]
-pyjobs = "run:main"
+pyjobs = "pyjobs.launcher:main"
 
 [dependency-groups]
 dev = [
@@ -47,7 +47,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["database", "models", "resume_parser", "run", "scraper"]
+known-first-party = ["pyjobs"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

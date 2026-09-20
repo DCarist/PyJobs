@@ -1,9 +1,9 @@
 import datetime
 from unittest.mock import patch
 
-from models import JobSearchProfile, SavedJob, SearchProfile
-from scraper import evaluate_job_staleness
-from task_manager import run_scrape_task_sync
+from pyjobs.models import JobSearchProfile, SavedJob, SearchProfile
+from pyjobs.services.scraper import evaluate_job_staleness
+from pyjobs.services.task_manager import run_scrape_task_sync
 
 
 def test_create_and_update_search_profile(client, db_session):
@@ -110,7 +110,7 @@ def test_async_scrape_flow_and_metrics(client, db_session):
         }
     ]
 
-    with patch("task_manager.fetch_jobs", return_value=mock_jobs):
+    with patch("pyjobs.services.task_manager.fetch_jobs", return_value=mock_jobs):
         # Trigger async scrape start
         response = client.post(f"/scrape/start?profile_id={profile.id}")
         assert response.status_code == 200
@@ -245,3 +245,133 @@ def test_profile_sidebar_unsaved_modal_markup(client, db_session):
     assert 'id="modal-scrape-without-saving"' in res.text
     assert f"window.scrapeWithoutSaving('{p.id}')" in res.text
     assert 'id="modal-cancel-scrape"' in res.text
+
+
+def test_search_profile_multi_day_schedule_options(client, db_session):
+    # 1. Create profile with 3-day (72h) refresh schedule
+    create_res = client.post(
+        "/profiles",
+        data={
+            "name": "3-Day Refresh Profile",
+            "positions": "Data Scientist",
+            "refresh_interval_hours": 72,
+        },
+    )
+    assert create_res.status_code == 200
+    p = (
+        db_session.query(SearchProfile)
+        .filter(SearchProfile.name == "3-Day Refresh Profile")
+        .first()
+    )
+    assert p is not None
+    assert p.refresh_interval_hours == 72
+
+    # 2. Update profile to 5-day (120h) refresh schedule
+    update_res = client.post(
+        f"/profiles/{p.id}",
+        data={
+            "name": "5-Day Refresh Profile",
+            "refresh_interval_hours": 120,
+        },
+    )
+    assert update_res.status_code == 200
+    db_session.refresh(p)
+    assert p.refresh_interval_hours == 120
+
+    # 3. Update profile to 7-day / weekly (168h) refresh schedule
+    update_res_7d = client.post(
+        f"/profiles/{p.id}",
+        data={
+            "name": "Weekly Refresh Profile",
+            "refresh_interval_hours": 168,
+        },
+    )
+    assert update_res_7d.status_code == 200
+    db_session.refresh(p)
+    assert p.refresh_interval_hours == 168
+
+    # 4. Verify negative interval is clamped to 0 (manual only)
+    clamp_res = client.post(
+        f"/profiles/{p.id}",
+        data={
+            "name": "Clamped Profile",
+            "refresh_interval_hours": -5,
+        },
+    )
+    assert clamp_res.status_code == 200
+    db_session.refresh(p)
+    assert p.refresh_interval_hours == 0
+
+
+def test_profile_sidebar_schedule_dropdown_markup(client, db_session):
+    p = SearchProfile(
+        name="Scheduled Profile",
+        positions="ML Engineer",
+        refresh_interval_hours=72,
+    )
+    db_session.add(p)
+    db_session.commit()
+
+    res = client.get(f"/profiles/sidebar?profile_id={p.id}")
+    assert res.status_code == 200
+
+    # Verify all schedule interval options are rendered
+    assert '<option value="0"' in res.text
+    assert "Manual Only" in res.text
+    assert '<option value="6"' in res.text
+    assert "Every 6 Hours" in res.text
+    assert '<option value="12"' in res.text
+    assert "Every 12 Hours" in res.text
+    assert '<option value="24"' in res.text
+    assert "Daily (Every 24h)" in res.text
+    assert '<option value="72" selected>Every 3 Days (72h)</option>' in res.text
+    assert '<option value="120">Every 5 Days (120h)</option>' in res.text
+    assert '<option value="168">Every 7 Days (Weekly)</option>' in res.text
+
+
+def test_profile_sidebar_equal_action_buttons_and_toast_notification(client, db_session):
+    p1 = SearchProfile(name="Profile One", positions="Dev")
+    p2 = SearchProfile(name="Profile Two", positions="QA")
+    db_session.add_all([p1, p2])
+    db_session.commit()
+
+    # 1. Verify equal sized buttons (flex: 1 1 0) on both Save and Delete
+    sidebar_res = client.get(f"/profiles/sidebar?profile_id={p1.id}")
+    assert sidebar_res.status_code == 200
+    assert "flex: 1 1 0;" in sidebar_res.text
+    assert "white-space: nowrap;" in sidebar_res.text
+    assert "Save Profile" in sidebar_res.text
+    assert "Delete" in sidebar_res.text
+    # Ensure inline success-msg is not present
+    assert "success-msg" not in sidebar_res.text
+
+    # 2. Verify update triggers top-right out-of-band toast notification
+    update_res = client.post(
+        f"/profiles/{p1.id}",
+        data={
+            "name": "Profile One Updated",
+            "positions": "Senior Dev",
+        },
+    )
+    assert update_res.status_code == 200
+    assert 'id="save-status-toast"' in update_res.text
+    assert 'hx-swap-oob="true"' in update_res.text
+    assert "save-status-badge" in update_res.text
+    assert "updated successfully!" in update_res.text
+    assert "success-msg" not in update_res.text
+
+    # 3. Verify delete triggers top-right out-of-band toast notification
+    del_res = client.delete(f"/profiles/{p2.id}")
+    assert del_res.status_code == 200
+    assert 'id="save-status-toast"' in del_res.text
+    assert 'hx-swap-oob="true"' in del_res.text
+    assert "save-status-badge" in del_res.text
+    assert "Profile deleted successfully." in del_res.text
+
+    # 4. Verify deleting last remaining profile shows error toast badge
+    del_last = client.delete(f"/profiles/{p1.id}")
+    assert del_last.status_code == 200
+    assert 'id="save-status-toast"' in del_last.text
+    assert 'hx-swap-oob="true"' in del_last.text
+    assert "save-status-badge error" in del_last.text
+    assert "Cannot delete the only remaining profile." in del_last.text

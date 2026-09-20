@@ -3,7 +3,7 @@ import datetime
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from models import ApplicationActivity, ApplicationContact, JobApplication, SavedJob
+from pyjobs.models import ApplicationActivity, ApplicationContact, JobApplication, SavedJob
 
 
 def test_track_job_from_feed(client: TestClient, db_session: Session):
@@ -693,3 +693,47 @@ def test_update_application_compliance_htmx_save_badge(client: TestClient, db_se
     assert app_record.portal_username == "dev@moderna.com"
     assert app_record.confirmation_number == "REQ-7788"
     assert len(app_record.activities) == 0
+
+
+def test_create_manual_application_saved_status(client: TestClient, db_session: Session):
+    today = datetime.date.today()
+    data = {
+        "company": "Anthropic",
+        "title": "Systems Engineer",
+        "location": "Remote",
+        "salary_stated": "$180k - $220k",
+        "method": "Company Website",
+        "status": "saved",
+        "applied_date": "",  # saved status clears/has no applied_date
+        "follow_up_date": "",  # should auto-default to +7 days from today
+    }
+    resp = client.post("/applications", data=data, follow_redirects=False)
+    assert resp.status_code == 303
+
+    app_record = (
+        db_session.query(JobApplication).filter(JobApplication.company == "Anthropic").first()
+    )
+    assert app_record is not None
+    assert app_record.status == "saved"
+    assert app_record.applied_date is None
+    assert app_record.follow_up_date == today + datetime.timedelta(days=7)
+
+
+def test_manual_application_modal_ui_tweaks(client: TestClient):
+    resp = client.get("/applications")
+    assert resp.status_code == 200
+
+    # 1. Verify Confirmation / App # label does not include "(For Unemployment)"
+    assert "Confirmation / App #" in resp.text
+    assert "Confirmation / App # (For Unemployment)" not in resp.text
+
+    # 2. Verify Cancel and Save Application buttons have equal flex: 1 1 0 width styling
+    assert (
+        'style="flex: 1 1 0; min-width: 0; justify-content: center; text-align: center;"'
+        in resp.text
+    )
+    assert "Save Application" in resp.text
+    assert "Cancel" in resp.text
+
+    # 3. Verify status select onchange handler is wired
+    assert 'onchange="window.handleManualAppStatusChange(this.value)"' in resp.text

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import datetime
 import logging
@@ -10,8 +12,8 @@ from typing import Any
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from models import JobSearchProfile, SavedJob, SearchProfile
-from scraper import evaluate_job_staleness, fetch_jobs
+from pyjobs.models import JobSearchProfile, SavedJob, SearchProfile
+from pyjobs.services.scraper import evaluate_job_staleness, fetch_jobs
 
 logger = logging.getLogger("pyjobs.task_manager")
 

@@ -3,10 +3,12 @@ from __future__ import annotations
 import datetime
 import io
 import logging
+import os
 import re
 from pathlib import Path
 
 import docx
+import docx2pdf
 import pymupdf
 
 logger = logging.getLogger(__name__)
@@ -133,8 +135,6 @@ def convert_docx_to_pdf_pure_pymupdf(docx_path: Path, output_pdf_path: Path) -> 
 
 def convert_docx_to_pdf(docx_path: str | Path, output_pdf_path: str | Path) -> bool:
     """Converts DOCX to PDF using Word COM (docx2pdf) if available, falling back to PyMuPDF."""
-    import os
-
     docx_p = Path(docx_path)
     output_p = Path(output_pdf_path)
     output_p.parent.mkdir(parents=True, exist_ok=True)
@@ -145,8 +145,6 @@ def convert_docx_to_pdf(docx_path: str | Path, output_pdf_path: str | Path) -> b
 
     # 1. Try docx2pdf (native Word / LibreOffice automation)
     try:
-        import docx2pdf
-
         docx2pdf.convert(str(docx_p), str(output_p))
         if output_p.exists() and output_p.stat().st_size > 0:
             return True

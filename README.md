@@ -6,12 +6,17 @@ PyJobs is a lightweight, full-stack Python application for intelligent job scrap
 
 ## Getting Started
 
+### Quick Start (Recommended)
+Double-click **`install.bat`** in the project root:
+* **First-Time Setup**: Checks for `uv` (prompts to install it automatically if missing), configures the virtual environment, installs dependencies via `uv sync`, and offers to launch PyJobs.
+* **Subsequent Runs / Updater**: Detects an existing installation, checks git repository status (prompting to safely stash uncommitted changes), pulls latest commits from `main`, and updates dependencies.
+
 ### Prerequisites
 * Python 3.14+
-* [uv](https://github.com/astral-sh/uv)
-* Node.js & npm (for Biome)
+* [uv](https://github.com/astral-sh/uv) (automatically installed via `install.bat` if missing)
+* Node.js & npm (for Biome code formatting/linting during development)
 
-### Installation
+### Manual Installation
 ```bash
 # Sync dependencies
 uv sync
@@ -55,8 +60,29 @@ uv run python run.py --host 0.0.0.0 --port 8080
 
 **Option 4: Direct Uvicorn**
 ```bash
-uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+uv run uvicorn pyjobs.main:app --host 0.0.0.0 --port 8000 --reload
 ```
+
+---
+
+## Package Architecture (`pyjobs/`)
+
+The application is structured into a modular Python package:
+* **`pyjobs.main`**: Lightweight FastAPI entrypoint, lifespan manager, static file mount, and router registration.
+* **`pyjobs.routers`**: Dedicated domain controllers:
+  * `discovery`: Discovery dashboard, user preferences, and instant/background scraping endpoints.
+  * `jobs`: Feed filtering, multi-format export, staleness verification, and 1-click tracking.
+  * `profiles`: Search profiles management and drawer partials.
+  * `applications`: Applications pipeline, Kanban/Table views, detail center, contacts, activities, and unemployment reports.
+  * `resumes`: Resumes dashboard, versions management, PDF viewer, and templated downloads.
+* **`pyjobs.services`**: Background workers and parsing engines:
+  * `scraper`: JobSpy scraping engine, location parsing, and salary/seniority classification.
+  * `scheduler`: In-app asyncio recurring search scheduler.
+  * `task_manager`: Background scrape task runner and SSE event streaming.
+  * `resume_parser`: PDF/DOCX text extraction, Word compilation, scoring, and dynamic filename generation.
+* **`pyjobs.database` & `pyjobs.models`**: DeclarativeBase, SessionLocal, and SQLAlchemy 2.0 models.
+* **`pyjobs.dependencies`**: Dependency injection (`get_db`, `templates`), upload path resolvers, and query helpers.
+* **`pyjobs.launcher`**: CLI argument parser, LAN IP detection, browser spawning, and server launcher.
 
 ---
 
@@ -107,7 +133,7 @@ set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
 * **Instant Feed Refresh**: Out-of-band DOM swap immediately updates the job results view upon scrape completion.
 
 ### Automated Scheduling & Background Refresh
-* **Per-Profile Intervals**: Configure automated background refreshes every 1, 6, 12, or 24 hours.
+* **Per-Profile Intervals**: Configure automated background refreshes (Manual, 6h, 12h, 24h / Daily, 3 days, 5 days, or 7 days / Weekly).
 * **Launch Check**: Mark profiles to scrape immediately on application launch (`refresh_on_launch`).
 * **In-App Scheduler**: Lightweight asyncio lifespan scheduler checks eligible profiles without requiring external cron daemons.
 

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import datetime
+import os
+from pathlib import Path
 
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./pyjobs.db"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DB_FILE = os.environ.get("PYJOBS_DB_PATH", str(PROJECT_ROOT / "pyjobs.db"))
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_FILE}"
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -206,8 +210,8 @@ def sync_job_classifications(session=None) -> int:
     """
     import re
 
-    from models import SavedJob
-    from scraper import categorize_salary, classify_seniority
+    from pyjobs.models import SavedJob
+    from pyjobs.services.scraper import categorize_salary, classify_seniority
 
     owns_session = False
     if session is None:
