@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import os
 import sys
 from unittest.mock import MagicMock, patch
 
-from run import get_local_ip, launch_browser, main, parse_args
+from pyjobs.launcher import get_local_ip, launch_browser, main, parse_args
 
 
 def test_launch_browser_calls_webbrowser():
@@ -57,7 +59,9 @@ def test_main_with_no_browser_flag(monkeypatch):
         patch("threading.Thread") as mock_thread,
     ):
         main()
-        mock_uvicorn.assert_called_once_with("main:app", host="127.0.0.1", port=8000, reload=True)
+        mock_uvicorn.assert_called_once_with(
+            "pyjobs.main:app", host="127.0.0.1", port=8000, reload=True
+        )
         mock_thread.assert_not_called()
 
 
@@ -70,7 +74,9 @@ def test_main_spawns_browser_thread(monkeypatch):
         patch("threading.Thread") as mock_thread,
     ):
         main()
-        mock_uvicorn.assert_called_once_with("main:app", host="127.0.0.1", port=8000, reload=True)
+        mock_uvicorn.assert_called_once_with(
+            "pyjobs.main:app", host="127.0.0.1", port=8000, reload=True
+        )
         mock_thread.assert_called_once()
         assert os.environ.get("PYJOBS_BROWSER_OPENED") == "1"
 
@@ -81,10 +87,12 @@ def test_main_with_network_flag(monkeypatch, capsys):
 
     with (
         patch("uvicorn.run") as mock_uvicorn,
-        patch("run.get_local_ip", return_value="192.168.1.99"),
+        patch("pyjobs.launcher.get_local_ip", return_value="192.168.1.99"),
     ):
         main()
-        mock_uvicorn.assert_called_once_with("main:app", host="0.0.0.0", port=8000, reload=True)
+        mock_uvicorn.assert_called_once_with(
+            "pyjobs.main:app", host="0.0.0.0", port=8000, reload=True
+        )
         captured = capsys.readouterr()
         assert "PyJobs Local Network Server" in captured.out
         assert "http://192.168.1.99:8000" in captured.out
@@ -98,4 +106,6 @@ def test_main_with_custom_host_and_port(monkeypatch):
 
     with patch("uvicorn.run") as mock_uvicorn:
         main()
-        mock_uvicorn.assert_called_once_with("main:app", host="10.0.0.5", port=9090, reload=True)
+        mock_uvicorn.assert_called_once_with(
+            "pyjobs.main:app", host="10.0.0.5", port=9090, reload=True
+        )

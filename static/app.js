@@ -236,7 +236,17 @@ window.saveAndScrapeProfile = (profileId) => {
     .then((html) => {
       const container = document.getElementById("profile-sidebar-container");
       if (container) {
-        container.innerHTML = html;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+        const oobToast = doc.getElementById("save-status-toast");
+        if (oobToast) {
+          const globalToast = document.getElementById("save-status-toast");
+          if (globalToast) {
+            globalToast.innerHTML = oobToast.innerHTML;
+          }
+          oobToast.remove();
+        }
+        container.innerHTML = doc.body.innerHTML;
         if (window.htmx) window.htmx.process(container);
       }
       window.initProfileFormState();
@@ -248,8 +258,107 @@ window.saveAndScrapeProfile = (profileId) => {
     });
 };
 
+// Sync and persist exclude_tracked checkbox state across navigation
+function initTrackedFilterPersistence() {
+  const checkbox = document.getElementById("exclude_tracked");
+  const form = document.getElementById("curation-form");
+  if (!checkbox) return;
+
+  try {
+    const saved = localStorage.getItem("pyjobs_exclude_tracked");
+    if (saved !== null) {
+      const shouldBeChecked = saved === "true";
+      if (checkbox.checked !== shouldBeChecked) {
+        checkbox.checked = shouldBeChecked;
+        checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    }
+  } catch (_) {}
+
+  checkbox.addEventListener("change", () => {
+    const val = checkbox.checked ? "true" : "false";
+    try {
+      localStorage.setItem("pyjobs_exclude_tracked", val);
+    } catch (_) {}
+  });
+
+  if (form) {
+    form.addEventListener("reset", () => {
+      setTimeout(() => {
+        try {
+          localStorage.setItem("pyjobs_exclude_tracked", "false");
+        } catch (_) {}
+      }, 0);
+    });
+  }
+}
+
+// ==============================================================================
+// Manual External Application Modal - Status & Date Logic
+// ==============================================================================
+window.handleManualAppStatusChange = (status) => {
+  const appliedDateInput = document.getElementById("manual-applied-date");
+  const followUpDateInput = document.getElementById("manual-follow-up-date");
+  if (!appliedDateInput || !followUpDateInput) return;
+
+  const formatDate = (d) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const now = new Date();
+  if (status === "applied") {
+    appliedDateInput.value = formatDate(now);
+    appliedDateInput.dispatchEvent(new Event("input", { bubbles: true }));
+    appliedDateInput.dispatchEvent(new Event("change", { bubbles: true }));
+
+    const twoWeeksLater = new Date(now);
+    twoWeeksLater.setDate(twoWeeksLater.getDate() + 14);
+    followUpDateInput.value = formatDate(twoWeeksLater);
+    followUpDateInput.dispatchEvent(new Event("input", { bubbles: true }));
+    followUpDateInput.dispatchEvent(new Event("change", { bubbles: true }));
+  } else if (status === "saved") {
+    appliedDateInput.value = "";
+    appliedDateInput.dispatchEvent(new Event("input", { bubbles: true }));
+    appliedDateInput.dispatchEvent(new Event("change", { bubbles: true }));
+
+    const oneWeekLater = new Date(now);
+    oneWeekLater.setDate(oneWeekLater.getDate() + 7);
+    followUpDateInput.value = formatDate(oneWeekLater);
+    followUpDateInput.dispatchEvent(new Event("input", { bubbles: true }));
+    followUpDateInput.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+};
+
+window.openManualAppModal = () => {
+  const modal = document.getElementById("manual-app-modal");
+  if (!modal) return;
+  const form = modal.querySelector("form");
+  if (form) form.reset();
+  const statusSelect = document.getElementById("manual-status");
+  if (statusSelect) {
+    statusSelect.value = "applied";
+    window.handleManualAppStatusChange("applied");
+  }
+  modal.showModal();
+};
+
+window.initManualAppModal = () => {
+  const statusSelect = document.getElementById("manual-status");
+  if (statusSelect && !statusSelect.dataset.statusListenerAttached) {
+    statusSelect.dataset.statusListenerAttached = "true";
+    statusSelect.addEventListener("change", (e) => {
+      window.handleManualAppStatusChange(e.target.value);
+    });
+  }
+};
+
 document.addEventListener("DOMContentLoaded", () => {
   window.initProfileFormState();
+  initTrackedFilterPersistence();
+  window.initManualAppModal();
 });
 
 document.addEventListener("htmx:afterSwap", (evt) => {
@@ -259,6 +368,15 @@ document.addEventListener("htmx:afterSwap", (evt) => {
       evt.detail.target.closest?.("#profile-sidebar-container"))
   ) {
     window.initProfileFormState();
+  }
+  window.initManualAppModal();
+  const toast = document.getElementById("save-status-toast");
+  if (toast) {
+    toast.style.position = "fixed";
+    toast.style.top = "1.25rem";
+    toast.style.right = "1.5rem";
+    toast.style.zIndex = "999999";
+    toast.style.pointerEvents = "none";
   }
 });
 
@@ -276,3 +394,14 @@ document.addEventListener("click", (e) => {
     }
   }
 });
+
+// Clean up ?saved= from browser address bar after page load without triggering refresh
+if (window.location.search.includes("saved=")) {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("saved");
+  window.history.replaceState(
+    {},
+    document.title,
+    url.pathname + (url.search ? url.search : "") + url.hash,
+  );
+}

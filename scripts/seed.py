@@ -1,7 +1,11 @@
 import datetime
+import sys
+from pathlib import Path
 
-from database import SessionLocal, init_db
-from models import (
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from pyjobs.database import SessionLocal, init_db
+from pyjobs.models import (
     ApplicationActivity,
     ApplicationContact,
     JobApplication,

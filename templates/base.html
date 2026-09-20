@@ -10,7 +10,7 @@
       rel="stylesheet"
     >
     <!-- CSS -->
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/styles.css?v=3">
     <!-- HTMX -->
     <script
       src="https://unpkg.com/htmx.org@1.9.10"
@@ -19,6 +19,11 @@
     ></script>
   </head>
   <body>
+    <div id="save-status-toast" class="save-status-toast" aria-live="polite">
+      {% if request and request.query_params.get('saved') %}
+      <div class="save-status-badge">✓ {{ request.query_params.get('saved') }}</div>
+      {% endif %}
+    </div>
     <div class="container">
       <header class="app-header">
         <div class="header-brand">
@@ -42,6 +47,9 @@
             class="nav-tab {% if active_page == 'unemployment' %}active{% endif %}"
           >
             <span>📑 Work-Search Log</span>
+          </a>
+          <a href="/resumes" class="nav-tab {% if active_page == 'resumes' %}active{% endif %}">
+            <span>📄 Resumes</span>
           </a>
         </nav>
       </header>

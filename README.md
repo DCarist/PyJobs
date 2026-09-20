@@ -6,12 +6,17 @@ PyJobs is a lightweight, full-stack Python application for intelligent job scrap
 
 ## Getting Started
 
+### Quick Start (Recommended)
+Double-click **`install.bat`** in the project root:
+* **First-Time Setup**: Checks for `uv` (prompts to install it automatically if missing), configures the virtual environment, installs dependencies via `uv sync`, and offers to launch PyJobs.
+* **Subsequent Runs / Updater**: Detects an existing installation, checks git repository status (prompting to safely stash uncommitted changes), pulls latest commits from `main`, and updates dependencies.
+
 ### Prerequisites
 * Python 3.14+
-* [uv](https://github.com/astral-sh/uv)
-* Node.js & npm (for Biome)
+* [uv](https://github.com/astral-sh/uv) (automatically installed via `install.bat` if missing)
+* Node.js & npm (for Biome code formatting/linting during development)
 
-### Installation
+### Manual Installation
 ```bash
 # Sync dependencies
 uv sync
@@ -55,8 +60,29 @@ uv run python run.py --host 0.0.0.0 --port 8080
 
 **Option 4: Direct Uvicorn**
 ```bash
-uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+uv run uvicorn pyjobs.main:app --host 0.0.0.0 --port 8000 --reload
 ```
+
+---
+
+## Package Architecture (`pyjobs/`)
+
+The application is structured into a modular Python package:
+* **`pyjobs.main`**: Lightweight FastAPI entrypoint, lifespan manager, static file mount, and router registration.
+* **`pyjobs.routers`**: Dedicated domain controllers:
+  * `discovery`: Discovery dashboard, user preferences, and instant/background scraping endpoints.
+  * `jobs`: Feed filtering, multi-format export, staleness verification, and 1-click tracking.
+  * `profiles`: Search profiles management and drawer partials.
+  * `applications`: Applications pipeline, Kanban/Table views, detail center, contacts, activities, and unemployment reports.
+  * `resumes`: Resumes dashboard, versions management, PDF viewer, and templated downloads.
+* **`pyjobs.services`**: Background workers and parsing engines:
+  * `scraper`: JobSpy scraping engine, location parsing, and salary/seniority classification.
+  * `scheduler`: In-app asyncio recurring search scheduler.
+  * `task_manager`: Background scrape task runner and SSE event streaming.
+  * `resume_parser`: PDF/DOCX text extraction, Word compilation, scoring, and dynamic filename generation.
+* **`pyjobs.database` & `pyjobs.models`**: DeclarativeBase, SessionLocal, and SQLAlchemy 2.0 models.
+* **`pyjobs.dependencies`**: Dependency injection (`get_db`, `templates`), upload path resolvers, and query helpers.
+* **`pyjobs.launcher`**: CLI argument parser, LAN IP detection, browser spawning, and server launcher.
 
 ---
 
@@ -107,7 +133,7 @@ set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
 * **Instant Feed Refresh**: Out-of-band DOM swap immediately updates the job results view upon scrape completion.
 
 ### Automated Scheduling & Background Refresh
-* **Per-Profile Intervals**: Configure automated background refreshes every 1, 6, 12, or 24 hours.
+* **Per-Profile Intervals**: Configure automated background refreshes (Manual, 6h, 12h, 24h / Daily, 3 days, 5 days, or 7 days / Weekly).
 * **Launch Check**: Mark profiles to scrape immediately on application launch (`refresh_on_launch`).
 * **In-App Scheduler**: Lightweight asyncio lifespan scheduler checks eligible profiles without requiring external cron daemons.
 
@@ -116,13 +142,14 @@ set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
 * **Dead Link Verification**: Postings verified as dead/404 via HTTP `HEAD` checks show a red `Dead Link` warning.
 * **1-Click Bulk Auto-Hide**: Hide all stale postings with a single click to keep your active pipeline clean.
 * **Active vs. Stale Filtering**: Main feed filters allow viewing `All Postings`, `Active Only`, or `Stale Only`.
+* **Hide Tracked Postings**: Instant toggle (`Hide tracked jobs`) filters out postings that are already being tracked in your pipeline (saved, applied, interviewing, cancelled, or URL-matched), with automatic cookie and localStorage state persistence across navigation.
 
 ---
 
 ## Application Tracking & Unemployment Compliance
 
 ### Application Pipeline (`/applications`)
-* **1-Click Feed Tracking**: Track jobs directly from the curated feed with automatic follow-up dates (+14 days) and audit logging.
+* **1-Click Feed Tracking & Saving**: Track jobs as applied (`📌 Track Application`) or save them to apply later (`💾 Save Job`) directly from the search feed with automatic audit logging.
 * **Interactive Kanban Board**: Visual drag-and-drop workflow across 6 pipeline stages:
   * `📌 Saved / To Apply`
   * `✉️ Applied`
@@ -133,16 +160,32 @@ set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
 * **Detailed Table View**: Filterable table with quick stage dropdowns, contact counters, follow-up dates, and direct management links.
 * **Follow-Up Reminders**: Visual indicators for `Due Today`, `Overdue`, and `Upcoming` follow-ups.
 * **Application Detail Command Center (`/applications/{id}`)**:
+  * **Job Info Editor**: Quick modal dialog to edit posting company, role title, location, salary range, and URL with automatic feed-job syncing.
   * **Key Contacts**: 1-to-many relationship tracking recruiters, hiring managers, and internal referrals with email, phone, and LinkedIn URLs.
   * **Activity Timeline**: Reverse-chronological audit log capturing status transitions, interview prep notes, and outreach.
   * **Job Description Snapshot**: Manually editable snapshot preserving the original posting text even if the live posting expires.
 * **External Application Modal**: Log jobs applied to outside the feed (e.g. company careers portals, job fairs, direct emails).
 
 ### Unemployment Work-Search Audit Log (`/applications/unemployment-report`)
-* **Weekly Claim Certification**: Automatically aggregates all application submissions, phone screens, interviews, and contacts into Saturday week-ending periods.
+* **Weekly Claim Certification**: Automatically aggregates certified work-search applications, phone screens, interviews, and contacts into Saturday week-ending periods, while strictly excluding uncertified saved and cancelled job events.
 * **Compliance Standards**: Highlights whether each claim period meets the standard 3+ work-search activities requirement with visual badges.
 * **Audit Documentation**: Captures applicant portal creation, portal usernames, and confirmation numbers as official proof for state unemployment audits.
 * **Export & Print**: Dedicated print-to-PDF stylesheet and instant CSV export for submitting weekly claims.
+
+---
+
+## Resume Management & Versioning (`/resumes`)
+
+* **Targeted Resume Profiles & Person Tracking**: Organize resumes by role and candidate (e.g., "Douglas - MSAT Focused", "Marissa - General Resume") with dedicated Person associations and customizable tags.
+* **Candidate Filtering**: Filter resume cards instantly by referenced Person via dedicated top-level filter pills, integrated with keyword search and tag filters.
+* **Chronological Versioning**: Track document revisions over time (v1, v2, v3...) with explicit change notes and file metadata.
+* **High-Fidelity Document Processing**: Strict validation and parsing for industry-standard **PDF** and **Word (.docx)** files using **PyMuPDF** and **python-docx**.
+* **Automatic PDF Compilation**: Uploaded Word `.docx` documents are automatically compiled to `.pdf` upon upload, ensuring **100% of resume versions have a PDF available**.
+* **In-Browser PDF Reader**: Review resumes directly within the application in a native embedded PDF viewer with full zoom, search, scroll, and print controls, alongside an ATS-extracted plain-text inspector.
+* **Custom Retrieval Naming & Dating**: Download resumes with dynamic, template-driven naming patterns (e.g. `{name} {date}.{ext}` &rarr; `Douglas Jaymes Caristo 09-18-2026.docx`), automatically resolving `{name}` to each resume's assigned Person with fallback to global preferences.
+* **Application Tracker Integration**: Select and link specific resume versions to each tracked job application, inspect submitted versions on the application detail command center, and receive keyword-matching resume recommendations.
+* **Private, Hermetic Storage**: Uploaded files are safely stored in `uploads/resumes/`, strictly excluded from git tracking (`.gitignore`) to ensure privacy.
+
 
 ---
 

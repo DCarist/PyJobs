@@ -1,9 +1,15 @@
+from __future__ import annotations
+
 import datetime
+import os
+from pathlib import Path
 
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./pyjobs.db"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DB_FILE = os.environ.get("PYJOBS_DB_PATH", str(PROJECT_ROOT / "pyjobs.db"))
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_FILE}"
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -137,6 +143,58 @@ def init_db() -> None:
                             "created_at": now_utc,
                         },
                     )
+        # 5. Job applications resume_version_id migration
+        if "job_applications" in tables:
+            app_columns = [c["name"] for c in inspector.get_columns("job_applications")]
+            if "resume_version_id" not in app_columns:
+                conn.execute(
+                    text(
+                        "ALTER TABLE job_applications "
+                        "ADD COLUMN resume_version_id INTEGER DEFAULT NULL "
+                        "REFERENCES resume_versions(id) ON DELETE SET NULL"
+                    )
+                )
+
+        # 6. User preferences candidate naming and resume pattern migrations
+        if "user_preferences" in tables:
+            pref_columns = [c["name"] for c in inspector.get_columns("user_preferences")]
+            pref_defs = [
+                (
+                    "candidate_name",
+                    "ALTER TABLE user_preferences ADD COLUMN candidate_name VARCHAR DEFAULT ''",
+                ),
+                (
+                    "resume_filename_pattern",
+                    (
+                        "ALTER TABLE user_preferences ADD COLUMN resume_filename_pattern "
+                        "VARCHAR DEFAULT '{name} {date}.{ext}'"
+                    ),
+                ),
+                (
+                    "resume_date_format",
+                    (
+                        "ALTER TABLE user_preferences ADD COLUMN resume_date_format "
+                        "VARCHAR DEFAULT '%m-%d-%Y'"
+                    ),
+                ),
+            ]
+            for col_name, sql_stmt in pref_defs:
+                if col_name not in pref_columns:
+                    conn.execute(text(sql_stmt))
+
+        # 7. Resume versions column migrations
+        if "resume_versions" in tables:
+            rv_columns = [c["name"] for c in inspector.get_columns("resume_versions")]
+            if "pdf_path" not in rv_columns:
+                conn.execute(
+                    text("ALTER TABLE resume_versions ADD COLUMN pdf_path VARCHAR DEFAULT ''")
+                )
+
+        # 8. Resumes person column migration
+        if "resumes" in tables:
+            resume_columns = [c["name"] for c in inspector.get_columns("resumes")]
+            if "person" not in resume_columns:
+                conn.execute(text("ALTER TABLE resumes ADD COLUMN person VARCHAR DEFAULT ''"))
 
         conn.commit()
 
@@ -152,8 +210,8 @@ def sync_job_classifications(session=None) -> int:
     """
     import re
 
-    from models import SavedJob
-    from scraper import categorize_salary, classify_seniority
+    from pyjobs.models import SavedJob
+    from pyjobs.services.scraper import categorize_salary, classify_seniority
 
     owns_session = False
     if session is None:

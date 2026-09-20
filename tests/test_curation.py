@@ -5,9 +5,9 @@ import json
 import openpyxl
 from sqlalchemy.orm import Session
 
-from database import sync_job_classifications
-from models import SavedJob
-from scraper import _parse_valid_float, categorize_salary, classify_seniority
+from pyjobs.database import sync_job_classifications
+from pyjobs.models import JobApplication, SavedJob
+from pyjobs.services.scraper import _parse_valid_float, categorize_salary, classify_seniority
 
 
 def test_classify_seniority():
@@ -330,3 +330,180 @@ def test_sync_job_classifications(db_session):
     assert job2.seniority_level == "Director"
     assert job2.salary_source is None
     assert job2.salary_bracket == "Unspecified"
+
+
+def test_filter_exclude_tracked_jobs(client, db_session):
+    now = datetime.datetime.now(datetime.UTC)
+
+    # Job 1: Untracked
+    job1 = SavedJob(
+        job_id="job-untracked-1",
+        title="Untracked Python Engineer",
+        company="Alpha Systems",
+        location="Remote",
+        site="linkedin",
+        date_posted=now,
+        job_url="https://jobs.example.com/untracked-1",
+        is_hidden=False,
+    )
+    # Job 2: Tracked with application in status 'saved'
+    job2 = SavedJob(
+        job_id="job-tracked-saved",
+        title="Saved DevOps Lead",
+        company="Beta Systems",
+        location="Remote",
+        site="linkedin",
+        date_posted=now,
+        job_url="https://jobs.example.com/tracked-2",
+        is_hidden=False,
+    )
+    # Job 3: Tracked with application in status 'applied'
+    job3 = SavedJob(
+        job_id="job-tracked-applied",
+        title="Applied Tech Lead",
+        company="Gamma Systems",
+        location="Remote",
+        site="linkedin",
+        date_posted=now,
+        job_url="https://jobs.example.com/tracked-3",
+        is_hidden=False,
+    )
+    # Job 4: Tracked with application in status 'interviewing'
+    job4 = SavedJob(
+        job_id="job-tracked-interview",
+        title="Interviewing Architect",
+        company="Delta Systems",
+        location="Remote",
+        site="linkedin",
+        date_posted=now,
+        job_url="https://jobs.example.com/tracked-4",
+        is_hidden=False,
+    )
+    # Job 5: Tracked with application in status 'cancelled'
+    job5 = SavedJob(
+        job_id="job-tracked-cancelled",
+        title="Cancelled PM",
+        company="Epsilon Systems",
+        location="Remote",
+        site="linkedin",
+        date_posted=now,
+        job_url="https://jobs.example.com/tracked-5",
+        is_hidden=False,
+    )
+    # Job 6: Manually logged application matching job_url (no direct FK)
+    job6 = SavedJob(
+        job_id="job-url-matched",
+        title="URL Match Staff Eng",
+        company="Zeta Systems",
+        location="Remote",
+        site="linkedin",
+        date_posted=now,
+        job_url="https://jobs.example.com/tracked-6",
+        is_hidden=False,
+    )
+
+    db_session.add_all([job1, job2, job3, job4, job5, job6])
+    db_session.commit()
+
+    # Create associated JobApplications
+    app2 = JobApplication(
+        saved_job_id=job2.id,
+        title=job2.title,
+        company=job2.company,
+        status="saved",
+        job_url=job2.job_url,
+    )
+    app3 = JobApplication(
+        saved_job_id=job3.id,
+        title=job3.title,
+        company=job3.company,
+        status="applied",
+        job_url=job3.job_url,
+    )
+    app4 = JobApplication(
+        saved_job_id=job4.id,
+        title=job4.title,
+        company=job4.company,
+        status="interviewing",
+        job_url=job4.job_url,
+    )
+    app5 = JobApplication(
+        saved_job_id=job5.id,
+        title=job5.title,
+        company=job5.company,
+        status="cancelled",
+        job_url=job5.job_url,
+    )
+    app6 = JobApplication(
+        saved_job_id=None,
+        title="External Role",
+        company="Zeta Systems",
+        status="applied",
+        job_url=job6.job_url,
+    )
+    db_session.add_all([app2, app3, app4, app5, app6])
+    db_session.commit()
+
+    # Test 1: When exclude_tracked=false, all jobs appear
+    res_all = client.get("/jobs/filter?exclude_tracked=false")
+    assert res_all.status_code == 200
+    assert "Untracked Python Engineer" in res_all.text
+    assert "Saved DevOps Lead" in res_all.text
+    assert "Applied Tech Lead" in res_all.text
+    assert "Interviewing Architect" in res_all.text
+    assert "Cancelled PM" in res_all.text
+    assert "URL Match Staff Eng" in res_all.text
+
+    # Test 2: When exclude_tracked=true, all tracked jobs (any status or url match) are hidden
+    res_filtered = client.get("/jobs/filter?exclude_tracked=true")
+    assert res_filtered.status_code == 200
+    assert "Untracked Python Engineer" in res_filtered.text
+    assert "Saved DevOps Lead" not in res_filtered.text
+    assert "Applied Tech Lead" not in res_filtered.text
+    assert "Interviewing Architect" not in res_filtered.text
+    assert "Cancelled PM" not in res_filtered.text
+    assert "URL Match Staff Eng" not in res_filtered.text
+
+    # Test 3: Index endpoint respects exclude_tracked=true
+    res_index = client.get("/?exclude_tracked=true")
+    assert res_index.status_code == 200
+    assert "Untracked Python Engineer" in res_index.text
+    assert "Saved DevOps Lead" not in res_index.text
+    assert "Applied Tech Lead" not in res_index.text
+
+    # Test 4: Export endpoint respects exclude_tracked=true
+    res_export = client.get("/jobs/export?format=json&exclude_tracked=true")
+    assert res_export.status_code == 200
+    export_data = json.loads(res_export.text)
+    assert len(export_data) == 1
+    assert export_data[0]["Title"] == "Untracked Python Engineer"
+
+    # Test 5: Setting filter updates cookie
+    res_filter_cookie = client.get("/jobs/filter?exclude_tracked=true")
+    assert res_filter_cookie.cookies.get("pyjobs_exclude_tracked") == "true"
+
+    # Test 6: Navigating away and back without query params preserves filter from cookie
+    client.cookies.set("pyjobs_exclude_tracked", "true")
+    res_nav_back = client.get("/")
+    assert res_nav_back.status_code == 200
+    assert "Untracked Python Engineer" in res_nav_back.text
+    assert "Saved DevOps Lead" not in res_nav_back.text
+    assert 'id="exclude_tracked"' in res_nav_back.text
+    assert "checked" in res_nav_back.text
+
+    # Test 7: Export endpoint without explicit param respects cookie
+    res_export_cookie = client.get("/jobs/export?format=json")
+    assert res_export_cookie.status_code == 200
+    export_cookie_data = json.loads(res_export_cookie.text)
+    assert len(export_cookie_data) == 1
+    assert export_cookie_data[0]["Title"] == "Untracked Python Engineer"
+
+    # Test 8: Toggling off updates cookie to 'false' and nav back loads unfiltered
+    res_filter_off = client.get("/jobs/filter?exclude_tracked=false")
+    assert res_filter_off.cookies.get("pyjobs_exclude_tracked") == "false"
+
+    client.cookies.set("pyjobs_exclude_tracked", "false")
+    res_nav_back_unfiltered = client.get("/")
+    assert res_nav_back_unfiltered.status_code == 200
+    assert "Untracked Python Engineer" in res_nav_back_unfiltered.text
+    assert "Saved DevOps Lead" in res_nav_back_unfiltered.text

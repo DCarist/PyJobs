@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import datetime
 
 from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from database import Base
+from pyjobs.database import Base
 
 
 class UserPreference(Base):
@@ -15,6 +17,9 @@ class UserPreference(Base):
     fields: Mapped[str] = mapped_column(String, default="")  # comma separated
     sites: Mapped[str] = mapped_column(String, default="linkedin,indeed,google")
     is_remote: Mapped[bool] = mapped_column(Boolean, default=False)
+    candidate_name: Mapped[str] = mapped_column(String, default="")
+    resume_filename_pattern: Mapped[str] = mapped_column(String, default="{name} {date}.{ext}")
+    resume_date_format: Mapped[str] = mapped_column(String, default="%m-%d-%Y")
 
 
 class SearchProfile(Base):
@@ -153,7 +158,16 @@ class JobApplication(Base):
         onupdate=lambda: datetime.datetime.now(datetime.UTC),
     )
 
+    # Resume version attachment
+    resume_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("resume_versions.id", ondelete="SET NULL"),
+        nullable=True,
+        default=None,
+        index=True,
+    )
+
     saved_job: Mapped[SavedJob | None] = relationship(back_populates="applications")
+    resume_version: Mapped[ResumeVersion | None] = relationship(back_populates="applications")
     contacts: Mapped[list[ApplicationContact]] = relationship(
         back_populates="application",
         cascade="all, delete-orphan",
@@ -209,3 +223,52 @@ class ApplicationActivity(Base):
     )
 
     application: Mapped[JobApplication] = relationship(back_populates="activities")
+
+
+class Resume(Base):
+    """Represents a resume profile/container holding tagged versions."""
+
+    __tablename__ = "resumes"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    title: Mapped[str] = mapped_column(String, index=True)
+    person: Mapped[str] = mapped_column(String, default="", index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    tags: Mapped[str] = mapped_column(String, default="")  # comma separated e.g. 'Python, FastAPI'
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=lambda: datetime.datetime.now(datetime.UTC)
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.datetime.now(datetime.UTC),
+        onupdate=lambda: datetime.datetime.now(datetime.UTC),
+    )
+
+    versions: Mapped[list[ResumeVersion]] = relationship(
+        back_populates="resume",
+        cascade="all, delete-orphan",
+        order_by="ResumeVersion.version_number.desc()",
+    )
+
+
+class ResumeVersion(Base):
+    """Represents a specific chronological file version (v1, v2, etc.) of a resume."""
+
+    __tablename__ = "resume_versions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    resume_id: Mapped[int] = mapped_column(ForeignKey("resumes.id", ondelete="CASCADE"), index=True)
+    version_number: Mapped[int] = mapped_column(Integer, default=1)
+    original_filename: Mapped[str] = mapped_column(String, default="")
+    file_path: Mapped[str] = mapped_column(String, default="")  # original uploaded (.pdf/.docx)
+    pdf_path: Mapped[str] = mapped_column(String, default="")  # guaranteed rendered pdf
+    file_size: Mapped[int] = mapped_column(Integer, default=0)
+    file_type: Mapped[str] = mapped_column(String, default="pdf")  # 'pdf' or 'docx'
+    extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    change_notes: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=lambda: datetime.datetime.now(datetime.UTC)
+    )
+
+    resume: Mapped[Resume] = relationship(back_populates="versions")
+    applications: Mapped[list[JobApplication]] = relationship(back_populates="resume_version")

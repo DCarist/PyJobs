@@ -3,7 +3,7 @@ import datetime
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from models import ApplicationActivity, ApplicationContact, JobApplication, SavedJob
+from pyjobs.models import ApplicationActivity, ApplicationContact, JobApplication, SavedJob
 
 
 def test_track_job_from_feed(client: TestClient, db_session: Session):
@@ -42,6 +42,49 @@ def test_track_job_from_feed(client: TestClient, db_session: Session):
     # Verify initial activity was recorded
     assert len(app_record.activities) == 1
     assert app_record.activities[0].activity_type == "status_change"
+    assert app_record.activities[0].new_status == "applied"
+
+
+def test_track_job_as_saved_from_feed(client: TestClient, db_session: Session):
+    job = SavedJob(
+        job_id="test-job-save-001",
+        title="Lead DevOps Engineer",
+        company="CloudScale Inc",
+        location="Remote",
+        site="indeed",
+        job_url="https://indeed.com/viewjob?jk=789",
+    )
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    # 1. Click "Save Job" (?status=saved)
+    resp = client.post(f"/job/{job.id}/track?status=saved")
+    assert resp.status_code == 200
+    assert "Saved" in resp.text
+    assert "View Application" in resp.text
+    assert "Applied" not in resp.text
+
+    # Verify DB state: status is saved, no applied_date yet
+    app_record = (
+        db_session.query(JobApplication).filter(JobApplication.saved_job_id == job.id).first()
+    )
+    assert app_record is not None
+    assert app_record.status == "saved"
+    assert app_record.applied_date is None
+    assert len(app_record.activities) == 1
+    assert app_record.activities[0].new_status == "saved"
+
+    # 2. Later click "Track Application" (?status=applied) to upgrade
+    resp_upgrade = client.post(f"/job/{job.id}/track?status=applied")
+    assert resp_upgrade.status_code == 200
+    assert "Applied" in resp_upgrade.text
+    assert "View Application" in resp_upgrade.text
+
+    db_session.refresh(app_record)
+    assert app_record.status == "applied"
+    assert app_record.applied_date == datetime.date.today()
+    assert len(app_record.activities) == 2
     assert app_record.activities[0].new_status == "applied"
 
 
@@ -423,7 +466,32 @@ def test_unemployment_report_and_export(client: TestClient, db_session: Session)
         method="LinkedIn",
         status="applied",
     )
-    db_session.add_all([app1, app2])
+    # Saved and cancelled applications should NOT be listed in activities for the report
+    app_saved = JobApplication(
+        company="SavedCo Technologies",
+        title="Wishlist Architect",
+        applied_date=datetime.date(2026, 9, 1),
+        method="Company Website",
+        status="saved",
+    )
+    app_cancelled = JobApplication(
+        company="Avalere Health",
+        title="Senior Medical Writer",
+        applied_date=datetime.date(2026, 9, 1),
+        method="Indeed",
+        status="cancelled",
+    )
+    db_session.add_all([app1, app2, app_saved, app_cancelled])
+    db_session.commit()
+
+    # Activity on a cancelled job should also be excluded
+    act_cancelled = ApplicationActivity(
+        application_id=app_cancelled.id,
+        activity_type="custom",
+        note="Applied to senior role instead. Cancelled.",
+        activity_date=datetime.date(2026, 9, 2),
+    )
+    db_session.add(act_cancelled)
     db_session.commit()
 
     # GET report page
@@ -433,6 +501,12 @@ def test_unemployment_report_and_export(client: TestClient, db_session: Session)
     assert "Amazon" in resp.text
     assert "Netflix" in resp.text
     assert "Week Ending: Saturday" in resp.text
+    # Ensure saved and cancelled job events are NOT listed in the report activities
+    assert "SavedCo Technologies" not in resp.text
+    assert "Wishlist Architect" not in resp.text
+    assert "Avalere Health" not in resp.text
+    assert "Senior Medical Writer" not in resp.text
+    assert "Applied to senior role instead" not in resp.text
 
     # GET CSV export
     resp_export = client.get("/applications/unemployment-report/export")
@@ -442,6 +516,10 @@ def test_unemployment_report_and_export(client: TestClient, db_session: Session)
     assert "Claim Week Ending" in csv_text
     assert "Amazon" in csv_text
     assert "Netflix" in csv_text
+    assert "SavedCo Technologies" not in csv_text
+    assert "Wishlist Architect" not in csv_text
+    assert "Avalere Health" not in csv_text
+    assert "Senior Medical Writer" not in csv_text
 
 
 def test_delete_application(client: TestClient, db_session: Session):
@@ -473,3 +551,189 @@ def test_seed_script_populates_pipeline_and_contacts(db_session: Session):
         # Verify idempotency on second run
         seed()
         assert db_session.query(JobApplication).count() == 3
+
+
+def test_update_application_job_info(client: TestClient, db_session: Session):
+    # Setup a saved job and application with incomplete or "None" company
+    job = SavedJob(
+        job_id="test-job-edit-info",
+        title="Sr. Manager, Quality Systems and Compliance Technology",
+        company="None",
+        location="Chesterbrook, PA, US",
+        job_url="https://indeed.com/viewjob?jk=12345",
+    )
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    app_record = JobApplication(
+        saved_job_id=job.id,
+        title=job.title,
+        company=job.company,
+        location=job.location,
+        job_url=job.job_url,
+        status="applied",
+    )
+    db_session.add(app_record)
+    db_session.commit()
+    db_session.refresh(app_record)
+
+    # Verify initial detail page shows Edit Job Info button and modal
+    detail_resp = client.get(f"/applications/{app_record.id}")
+    assert detail_resp.status_code == 200
+    assert "Edit Job Info" in detail_resp.text
+    assert "edit-job-dialog" in detail_resp.text
+
+    # Post updated job info (fix company name, refine title, salary, url)
+    post_resp = client.post(
+        f"/applications/{app_record.id}/job-info",
+        data={
+            "company": "AmerisourceBergen",
+            "title": "Director, Quality Systems & Compliance",
+            "location": "Chesterbrook, PA, US (Hybrid)",
+            "salary_stated": "$175k - $210k",
+            "job_url": "https://careers.amerisourcebergen.com/jobs/999",
+        },
+        follow_redirects=True,
+    )
+    assert post_resp.status_code == 200
+    assert "AmerisourceBergen" in post_resp.text
+    assert "Director, Quality Systems &amp; Compliance" in post_resp.text
+    assert "Chesterbrook, PA, US (Hybrid)" in post_resp.text
+    assert "$175k - $210k" in post_resp.text
+
+    # Verify DB state for application
+    db_session.refresh(app_record)
+    assert app_record.company == "AmerisourceBergen"
+    assert app_record.title == "Director, Quality Systems & Compliance"
+    assert app_record.location == "Chesterbrook, PA, US (Hybrid)"
+    assert app_record.salary_stated == "$175k - $210k"
+    assert app_record.job_url == "https://careers.amerisourcebergen.com/jobs/999"
+
+    # Verify underlying SavedJob was also synced
+    db_session.refresh(job)
+    assert job.company == "AmerisourceBergen"
+    assert job.title == "Director, Quality Systems & Compliance"
+    assert job.location == "Chesterbrook, PA, US (Hybrid)"
+    assert job.salary_bracket == "$175k - $210k"
+    assert job.job_url == "https://careers.amerisourcebergen.com/jobs/999"
+
+
+def test_update_application_follow_up_date(client: TestClient, db_session: Session):
+    app_record = JobApplication(
+        company="Regeneron",
+        title="Senior Validation Scientist",
+        status="applied",
+        applied_date=datetime.date(2026, 9, 10),
+        follow_up_date=None,
+    )
+    db_session.add(app_record)
+    db_session.commit()
+    db_session.refresh(app_record)
+
+    # 1. Update follow-up date (e.g. +2 weeks or change input)
+    resp = client.post(
+        f"/applications/{app_record.id}/follow-up",
+        data={"follow_up_date": "2026-09-24"},
+    )
+    assert resp.status_code == 200
+    assert "save-status-badge" in resp.text
+    assert "Reminder Date Saved" in resp.text
+
+    db_session.refresh(app_record)
+    assert app_record.follow_up_date == datetime.date(2026, 9, 24)
+    # Ensure no activity log was generated
+    assert len(app_record.activities) == 0
+
+    # 2. Clear follow-up date
+    resp_clear = client.post(
+        f"/applications/{app_record.id}/follow-up",
+        data={"follow_up_date": ""},
+    )
+    assert resp_clear.status_code == 200
+    assert "save-status-badge" in resp_clear.text
+    db_session.refresh(app_record)
+    assert app_record.follow_up_date is None
+    assert len(app_record.activities) == 0
+
+
+def test_update_application_compliance_htmx_save_badge(client: TestClient, db_session: Session):
+    app_record = JobApplication(
+        company="Moderna",
+        title="Principal Platform Engineer",
+        status="applied",
+        applied_date=datetime.date(2026, 9, 1),
+        method="Company Website",
+        account_created=False,
+    )
+    db_session.add(app_record)
+    db_session.commit()
+    db_session.refresh(app_record)
+
+    # HTMX request returns responsive save badge
+    resp = client.post(
+        f"/applications/{app_record.id}",
+        data={
+            "applied_date": "2026-09-12",
+            "method": "LinkedIn",
+            "account_created": "true",
+            "portal_username": "dev@moderna.com",
+            "confirmation_number": "REQ-7788",
+        },
+        headers={"HX-Request": "true"},
+    )
+    assert resp.status_code == 200
+    assert "save-status-badge" in resp.text
+    assert "Changes Saved" in resp.text
+
+    db_session.refresh(app_record)
+    assert app_record.applied_date == datetime.date(2026, 9, 12)
+    assert app_record.method == "LinkedIn"
+    assert app_record.account_created is True
+    assert app_record.portal_username == "dev@moderna.com"
+    assert app_record.confirmation_number == "REQ-7788"
+    assert len(app_record.activities) == 0
+
+
+def test_create_manual_application_saved_status(client: TestClient, db_session: Session):
+    today = datetime.date.today()
+    data = {
+        "company": "Anthropic",
+        "title": "Systems Engineer",
+        "location": "Remote",
+        "salary_stated": "$180k - $220k",
+        "method": "Company Website",
+        "status": "saved",
+        "applied_date": "",  # saved status clears/has no applied_date
+        "follow_up_date": "",  # should auto-default to +7 days from today
+    }
+    resp = client.post("/applications", data=data, follow_redirects=False)
+    assert resp.status_code == 303
+
+    app_record = (
+        db_session.query(JobApplication).filter(JobApplication.company == "Anthropic").first()
+    )
+    assert app_record is not None
+    assert app_record.status == "saved"
+    assert app_record.applied_date is None
+    assert app_record.follow_up_date == today + datetime.timedelta(days=7)
+
+
+def test_manual_application_modal_ui_tweaks(client: TestClient):
+    resp = client.get("/applications")
+    assert resp.status_code == 200
+
+    # 1. Verify Confirmation / App # label does not include "(For Unemployment)"
+    assert "Confirmation / App #" in resp.text
+    assert "Confirmation / App # (For Unemployment)" not in resp.text
+
+    # 2. Verify Cancel and Save Application buttons have equal flex: 1 1 0 width styling
+    assert (
+        'style="flex: 1 1 0; min-width: 0; justify-content: center; text-align: center;"'
+        in resp.text
+    )
+    assert "Save Application" in resp.text
+    assert "Cancel" in resp.text
+
+    # 3. Verify status select onchange handler is wired
+    assert 'onchange="window.handleManualAppStatusChange(this.value)"' in resp.text
