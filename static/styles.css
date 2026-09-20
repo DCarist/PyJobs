@@ -2409,3 +2409,11 @@ dialog.resume-viewer-dialog {
   animation: toastSlideFade 3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   pointer-events: none;
 }
+
+.save-status-badge.error {
+  background: rgba(239, 68, 68, 0.92);
+  border-color: rgba(248, 113, 113, 0.6);
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.4),
+    0 0 14px rgba(239, 68, 68, 0.4);
+}

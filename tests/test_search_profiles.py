@@ -327,3 +327,51 @@ def test_profile_sidebar_schedule_dropdown_markup(client, db_session):
     assert '<option value="72" selected>Every 3 Days (72h)</option>' in res.text
     assert '<option value="120">Every 5 Days (120h)</option>' in res.text
     assert '<option value="168">Every 7 Days (Weekly)</option>' in res.text
+
+
+def test_profile_sidebar_equal_action_buttons_and_toast_notification(client, db_session):
+    p1 = SearchProfile(name="Profile One", positions="Dev")
+    p2 = SearchProfile(name="Profile Two", positions="QA")
+    db_session.add_all([p1, p2])
+    db_session.commit()
+
+    # 1. Verify equal sized buttons (flex: 1 1 0) on both Save and Delete
+    sidebar_res = client.get(f"/profiles/sidebar?profile_id={p1.id}")
+    assert sidebar_res.status_code == 200
+    assert "flex: 1 1 0;" in sidebar_res.text
+    assert "white-space: nowrap;" in sidebar_res.text
+    assert "Save Profile" in sidebar_res.text
+    assert "Delete" in sidebar_res.text
+    # Ensure inline success-msg is not present
+    assert "success-msg" not in sidebar_res.text
+
+    # 2. Verify update triggers top-right out-of-band toast notification
+    update_res = client.post(
+        f"/profiles/{p1.id}",
+        data={
+            "name": "Profile One Updated",
+            "positions": "Senior Dev",
+        },
+    )
+    assert update_res.status_code == 200
+    assert 'id="save-status-toast"' in update_res.text
+    assert 'hx-swap-oob="true"' in update_res.text
+    assert "save-status-badge" in update_res.text
+    assert "updated successfully!" in update_res.text
+    assert "success-msg" not in update_res.text
+
+    # 3. Verify delete triggers top-right out-of-band toast notification
+    del_res = client.delete(f"/profiles/{p2.id}")
+    assert del_res.status_code == 200
+    assert 'id="save-status-toast"' in del_res.text
+    assert 'hx-swap-oob="true"' in del_res.text
+    assert "save-status-badge" in del_res.text
+    assert "Profile deleted successfully." in del_res.text
+
+    # 4. Verify deleting last remaining profile shows error toast badge
+    del_last = client.delete(f"/profiles/{p1.id}")
+    assert del_last.status_code == 200
+    assert 'id="save-status-toast"' in del_last.text
+    assert 'hx-swap-oob="true"' in del_last.text
+    assert "save-status-badge error" in del_last.text
+    assert "Cannot delete the only remaining profile." in del_last.text

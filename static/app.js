@@ -236,7 +236,17 @@ window.saveAndScrapeProfile = (profileId) => {
     .then((html) => {
       const container = document.getElementById("profile-sidebar-container");
       if (container) {
-        container.innerHTML = html;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+        const oobToast = doc.getElementById("save-status-toast");
+        if (oobToast) {
+          const globalToast = document.getElementById("save-status-toast");
+          if (globalToast) {
+            globalToast.innerHTML = oobToast.innerHTML;
+          }
+          oobToast.remove();
+        }
+        container.innerHTML = doc.body.innerHTML;
         if (window.htmx) window.htmx.process(container);
       }
       window.initProfileFormState();

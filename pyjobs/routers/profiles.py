@@ -150,7 +150,7 @@ async def delete_search_profile(request: Request, id: int, db: Session = Depends
                 "profiles": profiles,
                 "active_profile": profiles[0],
                 "is_new": False,
-                "message": "Cannot delete the only remaining profile.",
+                "error": "Cannot delete the only remaining profile.",
             },
         )
 
