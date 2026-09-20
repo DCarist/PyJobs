@@ -2,7 +2,8 @@
 param(
     [switch]$NonInteractive,
     [switch]$SkipLaunch,
-    [switch]$ForceUpdate
+    [switch]$ForceUpdate,
+    [switch]$SkipGit
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,7 +38,7 @@ if ($isExistingInstall) {
     Write-Host "[Update Mode] Existing installation detected." -ForegroundColor Yellow
     
     $hasGit = (Get-Command git -ErrorAction SilentlyContinue) -and (Test-Path (Join-Path $projectRoot ".git"))
-    if ($hasGit) {
+    if ($hasGit -and -not $SkipGit -and -not $env:PYJOBS_TESTING) {
         Write-Host "Checking git repository status..." -ForegroundColor Gray
         $statusOutput = git status --porcelain 2>&1
         $isDirty = ($statusOutput | Measure-Object).Count -gt 0

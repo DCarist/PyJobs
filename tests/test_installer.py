@@ -26,6 +26,7 @@ def test_install_ps1_contains_expected_parameters_and_logic():
     assert "[switch]$NonInteractive" in content
     assert "[switch]$SkipLaunch" in content
     assert "[switch]$ForceUpdate" in content
+    assert "[switch]$SkipGit" in content
     assert "uv sync" in content
     assert "Refresh-EnvPath" in content
     assert "Write-PyJobsBanner" in content
@@ -52,7 +53,7 @@ def test_install_ps1_powershell_syntax_and_execution():
     )
     assert ast_check.returncode == 0, f"AST parser found errors: {ast_check.stderr}"
 
-    # Run in non-interactive, skip-launch mode
+    # Run in non-interactive, skip-launch, skip-git mode
     run_result = subprocess.run(
         [
             powershell_cmd,
@@ -63,6 +64,7 @@ def test_install_ps1_powershell_syntax_and_execution():
             str(INSTALL_PS1),
             "-NonInteractive",
             "-SkipLaunch",
+            "-SkipGit",
         ],
         cwd=str(PROJECT_ROOT),
         capture_output=True,
