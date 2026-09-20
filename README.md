@@ -6,12 +6,17 @@ PyJobs is a lightweight, full-stack Python application for intelligent job scrap
 
 ## Getting Started
 
+### Quick Start (Recommended)
+Double-click **`install.bat`** in the project root:
+* **First-Time Setup**: Checks for `uv` (prompts to install it automatically if missing), configures the virtual environment, installs dependencies via `uv sync`, and offers to launch PyJobs.
+* **Subsequent Runs / Updater**: Detects an existing installation, checks git repository status (prompting to safely stash uncommitted changes), pulls latest commits from `main`, and updates dependencies.
+
 ### Prerequisites
 * Python 3.14+
-* [uv](https://github.com/astral-sh/uv)
-* Node.js & npm (for Biome)
+* [uv](https://github.com/astral-sh/uv) (automatically installed via `install.bat` if missing)
+* Node.js & npm (for Biome code formatting/linting during development)
 
-### Installation
+### Manual Installation
 ```bash
 # Sync dependencies
 uv sync
