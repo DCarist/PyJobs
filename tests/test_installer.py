@@ -85,3 +85,4 @@ def test_pyproject_build_system_and_wheel_overrides():
     assert "[tool.uv]" in content
     assert "override-dependencies" in content
     assert "regex>=2026.9.10" in content
+    assert "numpy>=2.0.0" in content
