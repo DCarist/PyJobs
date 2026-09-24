@@ -74,3 +74,14 @@ def test_install_ps1_powershell_syntax_and_execution():
     assert "PyJobs Installer & Updater" in run_result.stdout
     assert "Synchronizing Python environment" in run_result.stdout
     assert "synchronized successfully" in run_result.stdout
+
+
+def test_pyproject_build_system_and_wheel_overrides():
+    pyproject_path = PROJECT_ROOT / "pyproject.toml"
+    assert pyproject_path.is_file(), "pyproject.toml must exist"
+    content = pyproject_path.read_text(encoding="utf-8")
+    assert "[build-system]" in content
+    assert 'build-backend = "hatchling.build"' in content
+    assert "[tool.uv]" in content
+    assert "override-dependencies" in content
+    assert "regex>=2026.9.10" in content
