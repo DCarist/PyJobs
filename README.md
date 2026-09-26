@@ -30,6 +30,8 @@ uv tool install ty
 **Option 1: One-Click Local Launcher (This Machine Only)**
 Double-click `run.bat` in the project root. It will start the server on `127.0.0.1:8000` and automatically open PyJobs in your default web browser.
 
+On a clean `main` checkout, `run.bat` checks `origin/main` before launching. If a newer commit can be fast-forwarded, it asks before updating and relaunches automatically; declining or an unavailable network starts the installed version. Development branches (including `dev`), local changes, and diverged `main` are never updated by the launcher. This checks commits on the main branch, not GitHub release tags; `run_network.bat` and CLI launches do not check.
+
 **Option 2: One-Click Local Network Launcher (Other Devices on LAN)**
 Double-click `run_network.bat` in the project root. It binds to `0.0.0.0:8000`, automatically detects your machine's primary Wi-Fi/Ethernet LAN IP, and displays the direct access link:
 ```text
