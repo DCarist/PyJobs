@@ -156,7 +156,7 @@ set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
 
 ### Company Profiles & Directions (`/companies`)
 * Company profiles are built from saved postings and tracked applications, merging case-insensitive company names and observed physical work sites. Remote-only employers have no physical sites until one is entered.
-* Job cards show an office-icon company pill linked to its profile. If the scraper cannot identify an employer, use **Set company** on the card or the Company field in Posting Details; corrections update linked tracked applications and refresh the filtered feed.
+* Job cards and tracked-application details show the same office-icon company pill linked to its profile when identified. If the scraper cannot identify an employer, use **Set company** on the card or the Company field in Posting Details; corrections update linked tracked applications and refresh the filtered feed.
 * Scraped placeholder values such as `none` do not create company profiles. When the scraped name is missing, only explicit `Company:` or `Employer:` lines in the description are used; otherwise the posting stays unidentified for manual correction. A saved company name is retained across later scrapes.
 * Edit or add a site's street address on its profile. Observed city labels do not supply an assumed street address, and removing a posting does not remove its historical work site.
 * Save a separate home starting location on the Companies page. This does not change your search-profile target or the legacy search preference. Driving-directions links open Google Maps only when clicked; city-only destinations are marked **Approximate (city center)**. No Maps API key or geocoding is needed.

@@ -232,7 +232,7 @@ a.btn-secondary:hover {
   margin: 0;
 }
 
-.job-company .company-badge {
+.badge.company-badge {
   border: 1px solid rgba(56, 189, 248, 0.35);
   background: rgba(56, 189, 248, 0.12);
   color: #bae6fd;
@@ -240,12 +240,12 @@ a.btn-secondary:hover {
   text-decoration: none;
 }
 
-.job-company a.company-badge:visited {
+a.badge.company-badge:visited {
   color: #bae6fd;
 }
 
-.job-company a.company-badge:hover,
-.job-company a.company-badge:focus-visible {
+a.badge.company-badge:hover,
+a.badge.company-badge:focus-visible {
   background: rgba(56, 189, 248, 0.23);
   border-color: #38bdf8;
   text-decoration: none;
@@ -1641,8 +1641,11 @@ details[open] > summary.group-summary .group-chevron {
 }
 
 .detail-company {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
   margin: 0;
-  font-size: 1.15rem;
   color: var(--text-secondary);
   font-weight: 500;
 }

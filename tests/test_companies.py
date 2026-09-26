@@ -766,3 +766,34 @@ def test_company_directory_counts_visible_jobs_and_in_progress_applications(clie
     empty = client.get("/companies?hide_inactive=true")
     assert empty.status_code == 200
     assert all(visible_counts(empty, name) is None for name in companies)
+
+
+def test_application_detail_company_pill_links_known_employer(client, db_session):
+    company, _ = get_or_create_company_site(db_session, "Atlas Labs", "Allentown, PA")
+    assert company is not None
+    db_session.flush()
+    linked = JobApplication(
+        title="Quality Engineer",
+        company=company.name,
+        company_id=company.id,
+        location="Allentown, PA",
+    )
+    unidentified = JobApplication(title="Analyst", company="", location="Remote")
+    db_session.add_all([linked, unidentified])
+    db_session.commit()
+
+    detail = client.get(f"/applications/{linked.id}")
+    assert detail.status_code == 200
+    assert re.search(
+        rf'<a\b[^>]*href="/companies/{company.id}"[^>]*>.*?🏢.*?'
+        rf"{company.name}.*?</a\s*>",
+        detail.text,
+        re.DOTALL,
+    )
+    assert "📍 Allentown, PA" in detail.text
+
+    unknown_detail = client.get(f"/applications/{unidentified.id}")
+    assert unknown_detail.status_code == 200
+    assert "🏢</span>Company not identified" in unknown_detail.text
+    assert 'href="/companies/' not in unknown_detail.text
+    assert "📍 Remote" in unknown_detail.text
