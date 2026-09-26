@@ -6,6 +6,29 @@
       Observed employers and physical work sites from your saved jobs and applications.
     </p>
   </header>
+  <form action="/companies" method="get" class="glass-panel company-visibility-filter">
+    <label class="checkbox-label" for="hide-inactive-companies">
+      {% if hide_inactive %}
+      <input
+        id="hide-inactive-companies"
+        type="checkbox"
+        name="hide_inactive"
+        value="true"
+        checked
+        onchange="this.form.requestSubmit()"
+      >
+      {% else %}
+      <input
+        id="hide-inactive-companies"
+        type="checkbox"
+        name="hide_inactive"
+        value="true"
+        onchange="this.form.requestSubmit()"
+      >
+      {% endif %}
+      <span>Hide companies with no available postings or active applications</span>
+    </label>
+  </form>
   <section class="glass-panel company-panel" aria-labelledby="home-location-heading">
     <h3 id="home-location-heading">Your starting location</h3>
     <p class="section-subtitle">
@@ -25,9 +48,9 @@
   </section>
   <section aria-labelledby="company-list-heading">
     <h3 id="company-list-heading">Company profiles</h3>
-    {% if companies %}
+    {% if company_rows %}
     <div class="company-list company-directory-list">
-      {% for company in companies %}
+      {% for company, posting_count, application_count in company_rows %}
       <a class="glass-panel company-panel company-profile-card" href="/companies/{{ company.id }}">
         <span class="company-profile-name">
           <span aria-hidden="true">🏢</span>
@@ -37,12 +60,26 @@
           {{ company.sites|length }} physical work {% if company.sites|length == 1 %}site{% else
           %}sites{% endif %}
         </span>
+        <span class="company-activity-counts">
+          <span
+            class="badge company-posting-count{% if posting_count == 0 %} company-zero-count{% endif %}"
+            >{{ posting_count }} available {% if posting_count == 1 %}posting{% else %}postings{%
+            endif %}</span
+          >
+          <span
+            class="badge company-application-count{% if application_count == 0 %} company-zero-count{% endif %}"
+            >{{ application_count }} active {% if application_count == 1 %}application{% else
+            %}applications{% endif %}</span
+          >
+        </span>
       </a>
       {% endfor %}
     </div>
     {% else %}
     <p class="glass-panel company-panel">
-      No companies yet. Saved postings and applications will appear here.
+      {% if hide_inactive %} No companies with available postings or active applications. Turn off
+      the filter to see all companies. {% else %} No companies yet. Saved postings and applications
+      will appear here. {% endif %}
     </p>
     {% endif %}
   </section>

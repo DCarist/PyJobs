@@ -2612,6 +2612,16 @@ dialog.resume-viewer-dialog {
   margin: 0 0 0.5rem;
 }
 
+.company-visibility-filter {
+  display: flex;
+  align-items: center;
+  padding: 0.9rem 1.25rem;
+}
+
+.company-visibility-filter .checkbox-label {
+  margin: 0;
+}
+
 .company-panel {
   padding: 1.25rem;
 }
@@ -2658,6 +2668,27 @@ dialog.resume-viewer-dialog {
 .company-site-count {
   color: var(--text-secondary);
   font-size: 0.85rem;
+}
+
+.company-activity-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: auto;
+}
+
+.company-activity-counts .badge {
+  font-size: 0.76rem;
+}
+
+.company-activity-counts .company-application-count {
+  background: rgba(139, 92, 246, 0.18);
+  color: #c4b5fd;
+}
+
+.company-activity-counts .company-zero-count {
+  background: rgba(148, 163, 184, 0.1);
+  color: var(--text-secondary);
 }
 
 .company-site-action,

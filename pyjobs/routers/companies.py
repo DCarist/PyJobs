@@ -5,10 +5,11 @@ from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session, selectinload
 
 from pyjobs.dependencies import get_db, get_tracked_applications_map, templates
-from pyjobs.models import Company, CompanySite, UserPreference
+from pyjobs.models import Company, CompanySite, JobApplication, SavedJob, UserPreference
 from pyjobs.services.companies import get_or_create_company_site, is_valid_company_name
 
 router = APIRouter()
@@ -28,10 +29,50 @@ def _directions(origin: str, destination: str) -> str:
 
 
 @router.get("/companies", response_class=HTMLResponse)
-async def company_directory(request: Request, db: Session = Depends(get_db)):
-    companies = [
-        company
-        for company in db.query(Company).order_by(Company.name.asc()).all()
+async def company_directory(
+    request: Request, hide_inactive: bool = False, db: Session = Depends(get_db)
+):
+    available_postings = (
+        db.query(
+            SavedJob.company_id.label("company_id"),
+            func.count(SavedJob.id).label("posting_count"),
+        )
+        .filter(SavedJob.is_hidden.is_(False))
+        .group_by(SavedJob.company_id)
+        .subquery()
+    )
+    active_applications = (
+        db.query(
+            JobApplication.company_id.label("company_id"),
+            func.count(JobApplication.id).label("application_count"),
+        )
+        .filter(
+            JobApplication.status.in_(("saved", "applied", "screening", "interviewing", "offer"))
+        )
+        .group_by(JobApplication.company_id)
+        .subquery()
+    )
+    query = (
+        db.query(
+            Company,
+            func.coalesce(available_postings.c.posting_count, 0),
+            func.coalesce(active_applications.c.application_count, 0),
+        )
+        .options(selectinload(Company.sites))
+        .outerjoin(available_postings, available_postings.c.company_id == Company.id)
+        .outerjoin(active_applications, active_applications.c.company_id == Company.id)
+        .order_by(Company.name.asc())
+    )
+    if hide_inactive:
+        query = query.filter(
+            or_(
+                available_postings.c.posting_count > 0,
+                active_applications.c.application_count > 0,
+            )
+        )
+    company_rows = [
+        (company, posting_count, application_count)
+        for company, posting_count, application_count in query.all()
         if is_valid_company_name(company.name)
     ]
     preference = db.query(UserPreference).first()
@@ -39,7 +80,8 @@ async def company_directory(request: Request, db: Session = Depends(get_db)):
         request=request,
         name="companies.html",
         context={
-            "companies": companies,
+            "company_rows": company_rows,
+            "hide_inactive": hide_inactive,
             "home_location": preference.home_location if preference else "",
             "active_page": "companies",
         },

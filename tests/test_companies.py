@@ -677,3 +677,92 @@ def test_company_profile_shows_feed_jobs_and_tracker_applications(client, db_ses
     assert tracker.status_code == 200
     tracker_card = re.search(rf'<div\b[^>]*id="app-card-{application.id}"[^>]*>', tracker.text)
     assert tracker_card is not None and 'draggable="true"' in tracker_card.group()
+
+
+def test_company_directory_counts_visible_jobs_and_in_progress_applications(client, db_session):
+    companies = {
+        name: Company(name=name, name_key=name.casefold())
+        for name in ("Active Co", "Archived Co", "Applications Co", "Postings Co")
+    }
+    db_session.add_all(companies.values())
+    db_session.flush()
+
+    jobs = [
+        SavedJob(
+            job_id=f"activity-{index}",
+            company=companies[name].name,
+            company_id=companies[name].id,
+            is_hidden=hidden,
+        )
+        for index, (name, hidden) in enumerate(
+            [
+                ("Active Co", False),
+                ("Active Co", False),
+                ("Active Co", True),
+                ("Archived Co", True),
+                ("Postings Co", False),
+            ]
+        )
+    ]
+    applications = [
+        JobApplication(
+            company=companies[name].name,
+            company_id=companies[name].id,
+            status=status,
+        )
+        for name, status in [
+            ("Active Co", "saved"),
+            ("Active Co", "offer"),
+            ("Active Co", "rejected"),
+            ("Archived Co", "rejected"),
+            ("Archived Co", "withdrawn"),
+            ("Archived Co", "cancelled"),
+            ("Applications Co", "applied"),
+            ("Postings Co", "cancelled"),
+        ]
+    ]
+    db_session.add_all([*jobs, *applications])
+    db_session.commit()
+
+    def visible_counts(response, name):
+        company_id = companies[name].id
+        match = re.search(
+            rf'<a\b[^>]*href="/companies/{company_id}"[^>]*>(.*?)</a>',
+            response.text,
+            re.DOTALL,
+        )
+        if match is None:
+            return None
+        return tuple(
+            int(value)
+            for value in re.findall(
+                r"(\d+)\s+(?:available posting|active application)", match.group(1)
+            )
+        )
+
+    all_companies = client.get("/companies")
+    assert all_companies.status_code == 200
+    assert visible_counts(all_companies, "Active Co") == (2, 2)
+    assert visible_counts(all_companies, "Archived Co") == (0, 0)
+    assert visible_counts(all_companies, "Applications Co") == (0, 1)
+    assert visible_counts(all_companies, "Postings Co") == (1, 0)
+
+    filtered = client.get("/companies?hide_inactive=true")
+    assert filtered.status_code == 200
+    assert visible_counts(filtered, "Active Co") == (2, 2)
+    assert visible_counts(filtered, "Archived Co") is None
+    assert visible_counts(filtered, "Applications Co") == (0, 1)
+    assert visible_counts(filtered, "Postings Co") == (1, 0)
+    assert visible_counts(client.get("/companies?hide_inactive=false"), "Archived Co") == (
+        0,
+        0,
+    )
+
+    for job in jobs:
+        job.is_hidden = True
+    for application in applications:
+        application.status = "withdrawn"
+    db_session.commit()
+    empty = client.get("/companies?hide_inactive=true")
+    assert empty.status_code == 200
+    assert all(visible_counts(empty, name) is None for name in companies)

@@ -161,6 +161,7 @@ set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
 * Edit or add a site's street address on its profile. Observed city labels do not supply an assumed street address, and removing a posting does not remove its historical work site.
 * Save a separate home starting location on the Companies page. This does not change your search-profile target or the legacy search preference. Driving-directions links open Google Maps only when clicked; city-only destinations are marked **Approximate (city center)**. No Maps API key or geocoding is needed.
 * Company directory cards link to each profile. Profiles show related postings with the regular feed cards and tracked applications with the tracker cards (without drag-and-drop outside the tracker). Sites show a **Set home location** action when directions have no starting point.
+* Directory cards count unhidden postings and applications in active pipeline stages (`saved`, `applied`, `screening`, `interviewing`, `offer`). Rejected, withdrawn, and cancelled applications do not count as active. **Hide companies with no available postings or active applications** filters only the directory; it is off by default and retained in the URL on reload. Company profiles still show historical records.
 
 ---
 
