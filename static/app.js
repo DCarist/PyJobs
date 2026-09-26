@@ -258,20 +258,164 @@ window.saveAndScrapeProfile = (profileId) => {
     });
 };
 
-// Sync and persist exclude_tracked checkbox state across navigation
+// Keep native checkbox dropdown state, URL hydration, and form reset in sync.
+function updateCurationDropdownSummary(details) {
+  const summary = details.querySelector("[data-filter-summary]");
+  const allOption = details.querySelector("[data-filter-all]");
+  const selected = Array.from(details.querySelectorAll("input[name]")).filter(
+    (option) => option.checked,
+  );
+
+  if (!summary || !allOption) return;
+
+  allOption.checked = selected.length === 0;
+  if (selected.length === 0) {
+    summary.textContent = details.dataset.allLabel;
+  } else if (selected.length === 1) {
+    summary.textContent =
+      selected[0].closest("label")?.querySelector("span")?.textContent.trim() ?? selected[0].value;
+  } else {
+    summary.textContent = `${selected.length} selected`;
+  }
+}
+
+window.resetCurationFilters = () => {
+  const form = document.getElementById("curation-form");
+  if (!form) return;
+  form.reset();
+  form.querySelector("#curation-search").value = "";
+  for (const [id, value] of [
+    ["sort-select", "newest"],
+    ["group-select", "none"],
+    ["date-select", "all"],
+    ["staleness-select", "all"],
+  ]) {
+    form.querySelector(`#${id}`).value = value;
+  }
+  for (const details of form.querySelectorAll(".curation-dropdown")) {
+    for (const option of details.querySelectorAll("input[name]")) option.checked = false;
+    details.open = false;
+    updateCurationDropdownSummary(details);
+  }
+  form.querySelector("#include_unspecified").checked = true;
+  form.querySelector("#show_hidden").checked = false;
+  form.querySelector("#exclude_tracked").checked = false;
+  if (window.htmx) window.htmx.trigger("#curation-form", "change");
+};
+
+function isTruthyQueryValue(value) {
+  return ["true", "1", "yes", "on"].includes(value.toLowerCase());
+}
+
+function restoreCurationFormFromUrl() {
+  const form = document.getElementById("curation-form");
+  if (!form) return;
+
+  const params = new URLSearchParams(window.location.search);
+  const scalarControls = [
+    ["q", "curation-search"],
+    ["sort", "sort-select"],
+    ["group_by", "group-select"],
+    ["date_range", "date-select"],
+    ["staleness", "staleness-select"],
+  ];
+  for (const [name, id] of scalarControls) {
+    const values = params.getAll(name);
+    const control = document.getElementById(id);
+    if (values.length && control) {
+      const value = values[values.length - 1];
+      if (control instanceof HTMLSelectElement) {
+        if (Array.from(control.options).some((option) => option.value === value)) {
+          control.value = value;
+        }
+      } else {
+        control.value = value;
+      }
+    }
+  }
+
+  for (const details of form.querySelectorAll(".curation-dropdown[data-filter-name]")) {
+    const values = params.getAll(details.dataset.filterName).filter((value) => value !== "all");
+    if (params.has(details.dataset.filterName)) {
+      const options = Array.from(details.querySelectorAll("input[name]"));
+      for (const option of options) {
+        option.checked = values.includes(option.value);
+      }
+    }
+    updateCurationDropdownSummary(details);
+  }
+
+  for (const name of ["include_unspecified", "show_hidden", "exclude_tracked"]) {
+    const values = params.getAll(name);
+    const checkbox = form.querySelector(`input[type="checkbox"][name="${name}"]`);
+    if (values.length && checkbox) {
+      checkbox.checked = isTruthyQueryValue(values[values.length - 1]);
+    }
+  }
+
+  for (const details of form.querySelectorAll(".curation-dropdown")) {
+    for (const option of details.querySelectorAll('input[type="checkbox"]')) {
+      option.addEventListener("change", () => {
+        const allOption = details.querySelector("[data-filter-all]");
+        const individualOptions = Array.from(details.querySelectorAll("input[name]"));
+        if (option === allOption) {
+          if (option.checked) {
+            for (const individual of individualOptions) individual.checked = false;
+          } else if (!individualOptions.some((individual) => individual.checked)) {
+            option.checked = true;
+          }
+        } else if (option.checked) {
+          allOption.checked = false;
+        } else if (!individualOptions.some((individual) => individual.checked)) {
+          allOption.checked = true;
+        }
+        updateCurationDropdownSummary(details);
+      });
+    }
+  }
+
+  form.addEventListener("reset", () => {
+    window.setTimeout(() => {
+      for (const details of form.querySelectorAll(".curation-dropdown")) {
+        details.open = false;
+        updateCurationDropdownSummary(details);
+      }
+    }, 0);
+  });
+
+  document.addEventListener("click", (event) => {
+    for (const details of form.querySelectorAll(".curation-dropdown[open]")) {
+      if (!details.contains(event.target)) details.open = false;
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    const openDropdowns = Array.from(form.querySelectorAll(".curation-dropdown[open]"));
+    if (openDropdowns.length === 0) return;
+    const activeDropdown =
+      openDropdowns.find((details) => details.contains(document.activeElement)) ?? openDropdowns[0];
+    for (const details of openDropdowns) details.open = false;
+    activeDropdown.querySelector("summary")?.focus();
+  });
+}
+
 function initTrackedFilterPersistence() {
   const checkbox = document.getElementById("exclude_tracked");
   const form = document.getElementById("curation-form");
   if (!checkbox) return;
 
+  const hasUrlOverride = new URLSearchParams(window.location.search).has("exclude_tracked");
   try {
     const saved = localStorage.getItem("pyjobs_exclude_tracked");
-    if (saved !== null) {
+    if (!hasUrlOverride && saved !== null) {
       const shouldBeChecked = saved === "true";
       if (checkbox.checked !== shouldBeChecked) {
         checkbox.checked = shouldBeChecked;
         checkbox.dispatchEvent(new Event("change", { bubbles: true }));
       }
+    } else if (hasUrlOverride) {
+      localStorage.setItem("pyjobs_exclude_tracked", checkbox.checked ? "true" : "false");
     }
   } catch (_) {}
 
@@ -357,6 +501,7 @@ window.initManualAppModal = () => {
 
 document.addEventListener("DOMContentLoaded", () => {
   window.initProfileFormState();
+  restoreCurationFormFromUrl();
   initTrackedFilterPersistence();
   window.initManualAppModal();
 });

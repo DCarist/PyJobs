@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from pyjobs.models import JobSearchProfile, SavedJob, SearchProfile
+from pyjobs.services.companies import get_or_create_company_site
 from pyjobs.services.scraper import evaluate_job_staleness, fetch_jobs
 
 logger = logging.getLogger("pyjobs.task_manager")
@@ -82,13 +83,21 @@ def _ingest_jobs_for_profile(
 
             now_utc = datetime.datetime.now(datetime.UTC)
             is_stale = evaluate_job_staleness(date_posted, now_utc)
-
+            try:
+                company_record, _ = get_or_create_company_site(
+                    db, j.get("company") or "", j.get("location") or ""
+                )
+                db.flush()
+            except IntegrityError:
+                db.rollback()
+                continue
             new_job = SavedJob(
                 job_id=str(job_id),
                 site=j.get("site", ""),
                 title=j.get("title", ""),
                 company=j.get("company", ""),
                 location=j.get("location", ""),
+                company_id=company_record.id if company_record else None,
                 salary_source=j.get("salary_source"),
                 min_salary=j.get("min_salary"),
                 max_salary=j.get("max_salary"),
@@ -117,8 +126,30 @@ def _ingest_jobs_for_profile(
             except IntegrityError:
                 db.rollback()
         else:
-            # Refresh existing job metadata
+            # Refresh existing job metadata and its observed physical site.
             modified = False
+            observed_company = j.get("company") or existing_job.company
+            observed_location = j.get("location") or existing_job.location
+            try:
+                company_record, observed_site = get_or_create_company_site(
+                    db, observed_company, observed_location
+                )
+                site_created = observed_site is not None and observed_site.id is None
+                db.flush()
+            except IntegrityError:
+                db.rollback()
+                continue
+            modified = site_created
+            if existing_job.company_id != (company_record.id if company_record else None):
+                existing_job.company_id = company_record.id if company_record else None
+                modified = True
+            if j.get("company") and existing_job.company != j["company"]:
+                existing_job.company = j["company"]
+                modified = True
+            if j.get("location") and existing_job.location != j["location"]:
+                existing_job.location = j["location"]
+                modified = True
+            # Classification changes below share the same transaction.
             if j.get("seniority_level") and existing_job.seniority_level != j["seniority_level"]:
                 existing_job.seniority_level = j["seniority_level"]
                 modified = True

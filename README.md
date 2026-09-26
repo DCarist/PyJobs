@@ -75,11 +75,13 @@ The application is structured into a modular Python package:
   * `profiles`: Search profiles management and drawer partials.
   * `applications`: Applications pipeline, Kanban/Table views, detail center, contacts, activities, and unemployment reports.
   * `resumes`: Resumes dashboard, versions management, PDF viewer, and templated downloads.
+  * `companies`: Company directory, work-site address editing, and optional driving directions.
 * **`pyjobs.services`**: Background workers and parsing engines:
   * `scraper`: JobSpy scraping engine, location parsing, and salary/seniority classification.
   * `scheduler`: In-app asyncio recurring search scheduler.
   * `task_manager`: Background scrape task runner and SSE event streaming.
   * `resume_parser`: PDF/DOCX text extraction, Word compilation, scoring, and dynamic filename generation.
+  * `companies` / `locations`: Company/site deduplication, historical backfill, and US city/state grouping.
 * **`pyjobs.database` & `pyjobs.models`**: DeclarativeBase, SessionLocal, and SQLAlchemy 2.0 models.
 * **`pyjobs.dependencies`**: Dependency injection (`get_db`, `templates`), upload path resolvers, and query helpers.
 * **`pyjobs.launcher`**: CLI argument parser, LAN IP detection, browser spawning, and server launcher.
@@ -118,6 +120,7 @@ set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
   * Profile Name, Position Titles, and Required Skills/Fields.
   * Geographic Location, Search Radius (miles), and Remote Toggle.
   * Target Job Boards (`linkedin`, `indeed`, `google`, `zip_recruiter`, `glassdoor`).
+  * **10-mile radius** is available alongside 15/25/50/100 miles. Radius is passed to JobSpy, not applied as a second distance filter.
   * Desired Result Count & Max Posting Age (days).
 * **Sidebar Profile Switcher**: Switch active profiles seamlessly or create new profiles directly in the dashboard sidebar.
 * **Feed Filtering by Profile**: Filter the main jobs feed to inspect opportunities discovered by specific profiles or view all aggregated jobs.
@@ -143,6 +146,17 @@ set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
 * **1-Click Bulk Auto-Hide**: Hide all stale postings with a single click to keep your active pipeline clean.
 * **Active vs. Stale Filtering**: Main feed filters allow viewing `All Postings`, `Active Only`, or `Stale Only`.
 * **Hide Tracked Postings**: Instant toggle (`Hide tracked jobs`) filters out postings that are already being tracked in your pipeline (saved, applied, interviewing, cancelled, or URL-matched), with automatic cookie and localStorage state persistence across navigation.
+
+### Curated Feed Filters & Grouping
+* Seniority, salary bracket, source board, and discovery profile support multiple selections within each filter. Selected values match any option within that filter; filters combine across categories. An empty selection means all.
+* Salary brackets can include unspecified postings with the separate toggle; explicitly selecting Unspecified remains effective when that toggle is off.
+* Filter selections, sorting, and grouping live in the URL. Reloading a filtered URL restores the controls and server-rendered results; CSV, Excel, and JSON exports use the same filters and posting order.
+* Location grouping merges equivalent US city/state labels (for example, `Allentown, PA` and `Allentown, PA, US`). Group headings stay alphabetical; Sort By orders postings within each group.
+
+### Company Profiles & Directions (`/companies`)
+* Company profiles are built from saved postings and tracked applications, merging case-insensitive company names and observed physical work sites. Remote-only employers have no physical sites until one is entered.
+* Edit or add a site's street address on its profile. Observed city labels do not supply an assumed street address, and removing a posting does not remove its historical work site.
+* Save a separate home starting location on the Companies page. This does not change your search-profile target or the legacy search preference. Driving-directions links open Google Maps only when clicked; city-only destinations are marked **Approximate (city center)**. No Maps API key or geocoding is needed.
 
 ---
 

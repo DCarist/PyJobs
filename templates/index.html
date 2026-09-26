@@ -58,6 +58,7 @@
             name="q"
             id="curation-search"
             class="search-input"
+            value="{{ filters.q }}"
             placeholder="Instant search by title, company, or keyword..."
             hx-get="/jobs/filter"
             hx-target="#job-results"
@@ -97,43 +98,214 @@
 
           <!-- Seniority Level Filter -->
           <div class="control-item">
-            <label for="seniority-select">Seniority Level</label>
-            <select name="seniority" id="seniority-select">
-              <option value="all">All Seniority Levels</option>
-              <option value="Executive / VP">Executive / VP</option>
-              <option value="Director">Director</option>
-              <option value="Manager">Manager</option>
-              <option value="Supervisor / Lead">Supervisor / Lead</option>
-              <option value="Senior / Principal">Senior / Principal</option>
-              <option value="Specialist / Contributor">Specialist / Contributor</option>
-            </select>
+            <span class="control-label" id="seniority-filter-label">Seniority Level</span>
+            <details
+              class="curation-dropdown"
+              data-filter-name="seniority"
+              data-all-label="All Seniority Levels"
+            >
+              <summary
+                aria-labelledby="seniority-filter-label seniority-summary"
+                aria-controls="seniority-options"
+              >
+                <span id="seniority-summary" data-filter-summary>All Seniority Levels</span>
+              </summary>
+              <div class="curation-dropdown-menu" id="seniority-options">
+                <label for="seniority-all">
+                  <input type="checkbox" id="seniority-all" value="all" data-filter-all checked>
+                  <span>All Seniority Levels</span>
+                </label>
+                <label for="seniority-executive-vp">
+                  <input
+                    type="checkbox"
+                    id="seniority-executive-vp"
+                    name="seniority"
+                    value="Executive / VP"
+                  >
+                  <span>Executive / VP</span>
+                </label>
+                <label for="seniority-director">
+                  <input type="checkbox" id="seniority-director" name="seniority" value="Director">
+                  <span>Director</span>
+                </label>
+                <label for="seniority-manager">
+                  <input type="checkbox" id="seniority-manager" name="seniority" value="Manager">
+                  <span>Manager</span>
+                </label>
+                <label for="seniority-supervisor-lead">
+                  <input
+                    type="checkbox"
+                    id="seniority-supervisor-lead"
+                    name="seniority"
+                    value="Supervisor / Lead"
+                  >
+                  <span>Supervisor / Lead</span>
+                </label>
+                <label for="seniority-senior-principal">
+                  <input
+                    type="checkbox"
+                    id="seniority-senior-principal"
+                    name="seniority"
+                    value="Senior / Principal"
+                  >
+                  <span>Senior / Principal</span>
+                </label>
+                <label for="seniority-specialist-contributor">
+                  <input
+                    type="checkbox"
+                    id="seniority-specialist-contributor"
+                    name="seniority"
+                    value="Specialist / Contributor"
+                  >
+                  <span>Specialist / Contributor</span>
+                </label>
+              </div>
+            </details>
           </div>
 
           <!-- Salary Bracket Filter -->
           <div class="control-item">
-            <label for="salary-select">Salary Bracket</label>
-            <select name="salary_bracket" id="salary-select">
-              <option value="all">All Salary Brackets</option>
-              <option value="< $80k">&lt; $80k</option>
-              <option value="$80k - $120k">$80k - $120k</option>
-              <option value="$120k - $160k">$120k - $160k</option>
-              <option value="$160k - $200k">$160k - $200k</option>
-              <option value="$200k+">$200k+</option>
-              <option value="Unspecified">Unspecified Salary Only</option>
-            </select>
+            <span class="control-label" id="salary-filter-label">Salary Bracket</span>
+            <details
+              class="curation-dropdown"
+              data-filter-name="salary_bracket"
+              data-all-label="All Salary Brackets"
+            >
+              <summary
+                aria-labelledby="salary-filter-label salary-summary"
+                aria-controls="salary-options"
+              >
+                <span id="salary-summary" data-filter-summary>All Salary Brackets</span>
+              </summary>
+              <div class="curation-dropdown-menu" id="salary-options">
+                <label for="salary-all">
+                  <input type="checkbox" id="salary-all" value="all" data-filter-all checked>
+                  <span>All Salary Brackets</span>
+                </label>
+                <label for="salary-under-80k">
+                  <input
+                    type="checkbox"
+                    id="salary-under-80k"
+                    name="salary_bracket"
+                    value="&lt; $80k"
+                  >
+                  <span>&lt; $80k</span>
+                </label>
+                <label for="salary-80k-120k">
+                  <input
+                    type="checkbox"
+                    id="salary-80k-120k"
+                    name="salary_bracket"
+                    value="$80k - $120k"
+                  >
+                  <span>$80k - $120k</span>
+                </label>
+                <label for="salary-120k-160k">
+                  <input
+                    type="checkbox"
+                    id="salary-120k-160k"
+                    name="salary_bracket"
+                    value="$120k - $160k"
+                  >
+                  <span>$120k - $160k</span>
+                </label>
+                <label for="salary-160k-200k">
+                  <input
+                    type="checkbox"
+                    id="salary-160k-200k"
+                    name="salary_bracket"
+                    value="$160k - $200k"
+                  >
+                  <span>$160k - $200k</span>
+                </label>
+                <label for="salary-200k-plus">
+                  <input type="checkbox" id="salary-200k-plus" name="salary_bracket" value="$200k+">
+                  <span>$200k+</span>
+                </label>
+                <label for="salary-unspecified">
+                  <input
+                    type="checkbox"
+                    id="salary-unspecified"
+                    name="salary_bracket"
+                    value="Unspecified"
+                  >
+                  <span>Unspecified Salary Only</span>
+                </label>
+              </div>
+            </details>
           </div>
 
           <!-- Job Board Filter -->
           <div class="control-item">
-            <label for="site-select">Source Board</label>
-            <select name="site" id="site-select">
-              <option value="all">All Boards</option>
-              <option value="linkedin">LinkedIn</option>
-              <option value="indeed">Indeed</option>
-              <option value="google">Google Jobs</option>
-              <option value="zip_recruiter">ZipRecruiter</option>
-              <option value="glassdoor">Glassdoor</option>
-            </select>
+            <span class="control-label" id="site-filter-label">Source Board</span>
+            <details class="curation-dropdown" data-filter-name="site" data-all-label="All Boards">
+              <summary
+                aria-labelledby="site-filter-label site-summary"
+                aria-controls="site-options"
+              >
+                <span id="site-summary" data-filter-summary>All Boards</span>
+              </summary>
+              <div class="curation-dropdown-menu" id="site-options">
+                <label for="site-all">
+                  <input type="checkbox" id="site-all" value="all" data-filter-all checked>
+                  <span>All Boards</span>
+                </label>
+                <label for="site-linkedin">
+                  <input type="checkbox" id="site-linkedin" name="site" value="linkedin">
+                  <span>LinkedIn</span>
+                </label>
+                <label for="site-indeed">
+                  <input type="checkbox" id="site-indeed" name="site" value="indeed">
+                  <span>Indeed</span>
+                </label>
+                <label for="site-google">
+                  <input type="checkbox" id="site-google" name="site" value="google">
+                  <span>Google Jobs</span>
+                </label>
+                <label for="site-zip-recruiter">
+                  <input type="checkbox" id="site-zip-recruiter" name="site" value="zip_recruiter">
+                  <span>ZipRecruiter</span>
+                </label>
+                <label for="site-glassdoor">
+                  <input type="checkbox" id="site-glassdoor" name="site" value="glassdoor">
+                  <span>Glassdoor</span>
+                </label>
+              </div>
+            </details>
+          </div>
+
+          <!-- Discovery Profile Filter -->
+          <div class="control-item">
+            <span class="control-label" id="profile-filter-label">Discovered By</span>
+            <details
+              class="curation-dropdown"
+              data-filter-name="profile_id"
+              data-all-label="All Discovery Profiles"
+            >
+              <summary
+                aria-labelledby="profile-filter-label profile-summary"
+                aria-controls="profile-options"
+              >
+                <span id="profile-summary" data-filter-summary>All Discovery Profiles</span>
+              </summary>
+              <div class="curation-dropdown-menu" id="profile-options">
+                <label for="profile-all">
+                  <input type="checkbox" id="profile-all" value="all" data-filter-all checked>
+                  <span>All Discovery Profiles</span>
+                </label>
+                {% for p in profiles %}
+                <label for="profile-option-{{ p.id }}">
+                  <input
+                    type="checkbox"
+                    id="profile-option-{{ p.id }}"
+                    name="profile_id"
+                    value="{{ p.id }}"
+                  >
+                  <span>{{ p.name }}</span>
+                </label>
+                {% endfor %}
+              </div>
+            </details>
           </div>
 
           <!-- Date Posted Filter -->
@@ -146,17 +318,6 @@
               <option value="7d">Past Week</option>
               <option value="14d">Past 2 Weeks</option>
               <option value="30d">Past Month</option>
-            </select>
-          </div>
-
-          <!-- Discovery Profile Filter -->
-          <div class="control-item">
-            <label for="profile-select">Discovered By</label>
-            <select name="profile_id" id="profile-select">
-              <option value="all">All Discovery Profiles</option>
-              {% for p in profiles %}
-              <option value="{{ p.id }}">{{ p.name }}</option>
-              {% endfor %}
             </select>
           </div>
 
@@ -178,6 +339,7 @@
             style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: center;"
           >
             <label class="checkbox-label" for="include_unspecified">
+              <input type="hidden" name="include_unspecified" value="false">
               <input
                 type="checkbox"
                 id="include_unspecified"
@@ -193,6 +355,7 @@
               <span>View hidden postings</span>
             </label>
 
+            <input type="hidden" name="exclude_tracked" value="false">
             <label
               class="checkbox-label"
               for="exclude_tracked"
@@ -269,7 +432,7 @@
             <button
               type="button"
               class="btn-secondary btn-small"
-              onclick="document.getElementById('curation-form').reset(); htmx.trigger('#curation-search', 'input');"
+              onclick="resetCurationFilters()"
               title="Reset all filters to default"
             >
               Reset

@@ -112,7 +112,11 @@
         <label for="prof_distance">Radius (Miles)</label>
         <select id="prof_distance" name="distance_miles">
           {% set dist = 50 if is_new or not active_profile else active_profile.distance_miles %} {%
-          if dist == 15 %}
+          if dist == 10 %}
+          <option value="10" selected>10 miles</option>
+          {% else %}
+          <option value="10">10 miles</option>
+          {% endif %} {% if dist == 15 %}
           <option value="15" selected>15 miles</option>
           {% else %}
           <option value="15">15 miles</option>

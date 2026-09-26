@@ -1,0 +1,99 @@
+{% extends "base.html" %} {% block content %}
+<section class="company-page">
+  <a href="/companies" class="back-link">← All companies</a>
+  <header class="company-page-header">
+    <h2>{{ company.name }}</h2>
+    <p class="section-subtitle">
+      Observed locations and related opportunities. Street addresses are only shown when you enter
+      them.
+    </p>
+  </header>
+  <section aria-labelledby="company-sites-heading">
+    <h3 id="company-sites-heading">Physical work sites</h3>
+    {% if company.sites %}
+    <div class="company-list">
+      {% for site in company.sites %}
+      <article class="glass-panel company-panel">
+        <h4>{{ site.location }}</h4>
+        <p>
+          {% if site.address %}{{ site.address }}{% else %}Address not supplied · Approximate (city
+          center){% endif %}
+        </p>
+        {% if home_location %}
+        <a
+          href="{{ directions[site.id] }}"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="external-link"
+          >Driving directions{% if not site.address %} · Approximate (city center){% endif %} ↗</a
+        >
+        {% else %}
+        <a href="/companies#home-location">Set your starting location for directions</a>
+        {% endif %}
+        <form
+          method="post"
+          action="/companies/{{ company.id }}/sites/{{ site.id }}"
+          class="company-form"
+        >
+          <label for="site-address-{{ site.id }}">Street address for {{ site.location }}</label>
+          <input
+            id="site-address-{{ site.id }}"
+            name="address"
+            type="text"
+            value="{{ site.address }}"
+            placeholder="Street address (optional)"
+          >
+          <button type="submit" class="btn-secondary">Save address</button>
+        </form>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="glass-panel company-panel">
+      No physical sites observed. Remote-only jobs do not create work sites.
+    </p>
+    {% endif %}
+    <div class="glass-panel company-panel">
+      <h4>Add a work site</h4>
+      <form method="post" action="/companies/{{ company.id }}/sites" class="company-form">
+        <label for="new-site-location">Physical location</label>
+        <input
+          id="new-site-location"
+          name="location"
+          type="text"
+          required
+          placeholder="City, state or physical place"
+        >
+        <label for="new-site-address">Street address (optional)</label>
+        <input id="new-site-address" name="address" type="text" placeholder="Street address">
+        <button type="submit" class="btn-primary">Add work site</button>
+      </form>
+    </div>
+  </section>
+  <section class="company-related" aria-labelledby="company-jobs-heading">
+    <h3 id="company-jobs-heading">Saved postings</h3>
+    {% if company.saved_jobs %}
+    <ul>
+      {% for job in company.saved_jobs %}
+      <li><a href="/#job-{{ job.id }}">{{ job.title }}</a> · {{ job.location }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p>No saved postings linked.</p>
+    {% endif %}
+    <h3>Tracked applications</h3>
+    {% if company.applications %}
+    <ul>
+      {% for application in company.applications %}
+      <li>
+        <a href="/applications/{{ application.id }}">{{ application.title }}</a>
+        · {{ application.location }}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p>No tracked applications linked.</p>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}

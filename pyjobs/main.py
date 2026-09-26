@@ -14,7 +14,7 @@ from pyjobs.dependencies import (
     get_db,
     templates,
 )
-from pyjobs.routers import applications, discovery, jobs, profiles, resumes
+from pyjobs.routers import applications, companies, discovery, jobs, profiles, resumes
 from pyjobs.services.scheduler import start_scheduler, stop_scheduler
 from pyjobs.services.scraper import fetch_jobs
 
@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
         stop_scheduler()
 
 
-app = FastAPI(title="PyJobs", version="0.2.1", lifespan=lifespan)
+app = FastAPI(title="PyJobs", version="0.2.2", lifespan=lifespan)
 
 # Ensure required directories exist
 (TEMPLATES_DIR / "partials").mkdir(parents=True, exist_ok=True)
@@ -46,6 +46,7 @@ app.include_router(jobs.router)
 app.include_router(profiles.router)
 app.include_router(applications.router)
 app.include_router(resumes.router)
+app.include_router(companies.router)
 
 # Re-exports for backward compatibility
 __all__ = ["app", "get_db", "fetch_jobs", "templates", "PROJECT_ROOT"]

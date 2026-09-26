@@ -6,12 +6,21 @@ from pathlib import Path
 
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.pool import StaticPool
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DB_FILE = os.environ.get("PYJOBS_DB_PATH", str(PROJECT_ROOT / "pyjobs.db"))
-SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_FILE}"
-
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+DB_FILE = os.environ.get("PYJOBS_DB_PATH")
+if DB_FILE:
+    SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_FILE}"
+elif os.environ.get("PYJOBS_TESTING"):
+    SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+else:
+    SQLALCHEMY_DATABASE_URL = f"sqlite:///{PROJECT_ROOT / 'pyjobs.db'}"
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool if SQLALCHEMY_DATABASE_URL == "sqlite:///:memory:" else None,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -39,6 +48,10 @@ def init_db() -> None:
             if "is_remote" not in columns:
                 conn.execute(
                     text("ALTER TABLE user_preferences ADD COLUMN is_remote BOOLEAN DEFAULT 0")
+                )
+            if "home_location" not in columns:
+                conn.execute(
+                    text("ALTER TABLE user_preferences ADD COLUMN home_location VARCHAR DEFAULT ''")
                 )
 
         # 2. Saved jobs column migrations
@@ -79,6 +92,18 @@ def init_db() -> None:
             for col_name, sql_stmt in column_defs:
                 if col_name not in job_columns:
                     conn.execute(text(sql_stmt))
+            if "company_id" not in job_columns:
+                conn.execute(
+                    text(
+                        "ALTER TABLE saved_jobs ADD COLUMN company_id INTEGER DEFAULT NULL "
+                        "REFERENCES companies(id) ON DELETE SET NULL"
+                    )
+                )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_saved_jobs_company_id ON saved_jobs(company_id)"
+                )
+            )
 
         # 3. Job applications column migrations
         if "job_applications" in tables:
@@ -107,6 +132,19 @@ def init_db() -> None:
             for col_name, sql_stmt in app_defs:
                 if col_name not in app_columns:
                     conn.execute(text(sql_stmt))
+            if "company_id" not in app_columns:
+                conn.execute(
+                    text(
+                        "ALTER TABLE job_applications ADD COLUMN company_id INTEGER DEFAULT NULL "
+                        "REFERENCES companies(id) ON DELETE SET NULL"
+                    )
+                )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_job_applications_company_id "
+                    "ON job_applications(company_id)"
+                )
+            )
 
         # 4. Search profiles initial seed migration from user_preferences
         if "search_profiles" in tables and "user_preferences" in tables:
@@ -197,6 +235,10 @@ def init_db() -> None:
                 conn.execute(text("ALTER TABLE resumes ADD COLUMN person VARCHAR DEFAULT ''"))
 
         conn.commit()
+    from pyjobs.services.companies import sync_company_profiles
+
+    with SessionLocal() as session:
+        sync_company_profiles(session)
 
     # Backfill and synchronize existing job classifications and salary data
     sync_job_classifications()

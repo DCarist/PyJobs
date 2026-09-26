@@ -1,0 +1,44 @@
+{% extends "base.html" %} {% block content %}
+<section class="company-page">
+  <header class="company-page-header">
+    <h2>Companies</h2>
+    <p class="section-subtitle">
+      Observed employers and physical work sites from your saved jobs and applications.
+    </p>
+  </header>
+  <section class="glass-panel company-panel" aria-labelledby="home-location-heading">
+    <h3 id="home-location-heading">Your starting location</h3>
+    <p class="section-subtitle">
+      Stored locally; used only to create directions links when you open them.
+    </p>
+    <form method="post" action="/companies/home-location" class="company-form">
+      <label for="home-location">Home address or city</label>
+      <input
+        type="text"
+        id="home-location"
+        name="home_location"
+        value="{{ home_location }}"
+        placeholder="City, state or street address"
+      >
+      <button type="submit" class="btn-primary">Save starting location</button>
+    </form>
+  </section>
+  <section aria-labelledby="company-list-heading">
+    <h3 id="company-list-heading">Company profiles</h3>
+    {% if companies %}
+    <div class="company-list">
+      {% for company in companies %}
+      <article class="glass-panel company-panel">
+        <a href="/companies/{{ company.id }}">{{ company.name }}</a>
+        <p class="section-subtitle">{{ company.sites|length }} physical work sites</p>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="glass-panel company-panel">
+      No companies yet. Saved postings and applications will appear here.
+    </p>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}

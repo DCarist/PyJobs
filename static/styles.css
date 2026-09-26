@@ -675,7 +675,9 @@ a.btn-secondary:hover {
   gap: 0.35rem;
 }
 
-.control-item label {
+.control-item > label,
+.control-item > .control-label {
+  display: block;
   font-size: 0.78rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -687,6 +689,98 @@ a.btn-secondary:hover {
 .control-item select {
   font-size: 0.85rem;
   padding: 0.55rem 0.75rem;
+}
+
+.control-item .curation-dropdown {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.curation-dropdown[open] {
+  z-index: 5;
+}
+
+.curation-dropdown > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 2.2rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.6);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  line-height: 1.2;
+  cursor: pointer;
+  list-style: none;
+}
+
+.curation-dropdown > summary::-webkit-details-marker {
+  display: none;
+}
+
+.curation-dropdown > summary::after {
+  content: "▾";
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  transition: transform 0.15s ease;
+}
+
+.curation-dropdown[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.curation-dropdown > summary:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+.curation-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: min(18rem, 60vh);
+  overflow-y: auto;
+  padding: 0.35rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: #0f172a;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.curation-dropdown-menu label {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.45rem 0.55rem;
+  margin: 0;
+  border-radius: 5px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 400;
+  line-height: 1.25;
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: pointer;
+}
+
+.curation-dropdown-menu label:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.curation-dropdown-menu input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--primary);
 }
 
 .toolbar-bottom-row {
@@ -2416,4 +2510,51 @@ dialog.resume-viewer-dialog {
   box-shadow:
     0 4px 20px rgba(0, 0, 0, 0.4),
     0 0 14px rgba(239, 68, 68, 0.4);
+}
+
+.company-page {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.company-page-header {
+  text-align: left;
+  margin-bottom: 0;
+}
+
+.company-page-header h2 {
+  margin: 0 0 0.5rem;
+}
+
+.company-panel {
+  padding: 1.25rem;
+}
+
+.company-panel h4 {
+  margin: 0 0 0.5rem;
+}
+
+.company-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.company-form {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.company-form input {
+  width: 100%;
+}
+
+.company-form button {
+  justify-self: start;
+}
+
+.company-related {
+  border-top: 1px solid var(--border-color);
+  padding-top: 1rem;
 }

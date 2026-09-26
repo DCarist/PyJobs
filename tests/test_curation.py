@@ -1,13 +1,33 @@
+import csv
 import datetime
 import io
 import json
+import re
 
 import openpyxl
 from sqlalchemy.orm import Session
 
 from pyjobs.database import sync_job_classifications
-from pyjobs.models import JobApplication, SavedJob
+from pyjobs.dependencies import group_jobs
+from pyjobs.models import JobApplication, SavedJob, SearchProfile
+from pyjobs.services.locations import canonicalize_location
 from pyjobs.services.scraper import _parse_valid_float, categorize_salary, classify_seniority
+
+
+def test_canonical_location_groups_preserve_job_order():
+    assert canonicalize_location(" Allentown, pa (Hybrid) ") == "Allentown, PA, US"
+    assert canonicalize_location("Allentown, PA, United States (On-site)") == "Allentown, PA, US"
+    assert canonicalize_location("Berlin, BE") == "Berlin, BE"
+    assert canonicalize_location("Remote") == "Remote"
+    jobs = [
+        SavedJob(job_id="2", location="Allentown, PA, US"),
+        SavedJob(job_id="1", location="Allentown, PA"),
+        SavedJob(job_id="3", location="Remote"),
+        SavedJob(job_id="4", location=""),
+    ]
+    groups = group_jobs(jobs, "location")
+    assert list(groups) == ["Allentown, PA, US", "Remote", "Unknown Location"]
+    assert [job.job_id for job in groups["Allentown, PA, US"]] == ["2", "1"]
 
 
 def test_classify_seniority():
@@ -507,3 +527,126 @@ def test_filter_exclude_tracked_jobs(client, db_session):
     assert res_nav_back_unfiltered.status_code == 200
     assert "Untracked Python Engineer" in res_nav_back_unfiltered.text
     assert "Saved DevOps Lead" in res_nav_back_unfiltered.text
+
+
+def test_multiselect_group_order_export_and_navigation(client, db_session):
+    now = datetime.datetime.now(datetime.UTC)
+    p1 = SearchProfile(name="Alpha", positions="Engineer")
+    p2 = SearchProfile(name="Beta", positions="Manager")
+    db_session.add_all([p1, p2])
+    db_session.flush()
+    jobs = [
+        SavedJob(
+            job_id="multi-a",
+            title="A Director",
+            company="One",
+            location="Allentown, PA",
+            site="linkedin",
+            seniority_level="Director",
+            salary_bracket="$120k - $160k",
+            date_posted=now - datetime.timedelta(days=1),
+        ),
+        SavedJob(
+            job_id="multi-b",
+            title="B Manager",
+            company="Two",
+            location="Allentown, PA, US",
+            site="indeed",
+            seniority_level="Manager",
+            salary_bracket="$160k - $200k",
+            date_posted=now - datetime.timedelta(days=2),
+        ),
+        SavedJob(
+            job_id="multi-c",
+            title="C Director",
+            company="Three",
+            location="Boston, MA",
+            site="linkedin",
+            seniority_level="Director",
+            salary_bracket="Unspecified",
+            date_posted=now - datetime.timedelta(days=3),
+        ),
+        SavedJob(
+            job_id="multi-d",
+            title="D Manager",
+            company="Four",
+            location="Boston, MA, US",
+            site="indeed",
+            seniority_level="Manager",
+            salary_bracket="$120k - $160k",
+            date_posted=now - datetime.timedelta(days=4),
+        ),
+    ]
+    jobs[0].search_profiles.extend([p1, p2])
+    jobs[1].search_profiles.append(p1)
+    jobs[2].search_profiles.append(p2)
+    jobs[3].search_profiles.append(p2)
+    db_session.add_all(jobs)
+    db_session.commit()
+    query = [
+        ("seniority", "Director"),
+        ("seniority", "Manager"),
+        ("site", "linkedin"),
+        ("site", "indeed"),
+        ("profile_id", str(p1.id)),
+        ("profile_id", str(p2.id)),
+        ("group_by", "location"),
+        ("sort", "newest"),
+    ]
+    hx = client.get("/jobs/filter", params=query, headers={"HX-Request": "true"})
+    assert hx.status_code == 200
+    assert hx.text.count(f'id="job-{jobs[0].id}"') == 1
+    assert hx.text.count('class="group-title">Allentown, PA, US') == 1
+    assert hx.text.count('class="group-title">Boston, MA, US') == 1
+    assert hx.text.index("A Director") < hx.text.index("B Manager")
+    assert hx.text.index("C Director") < hx.text.index("D Manager")
+    oldest = client.get(
+        "/jobs/filter", params=[*query[:-1], ("sort", "oldest")], headers={"HX-Request": "true"}
+    )
+    assert oldest.text.index("B Manager") < oldest.text.index("A Director")
+    assert oldest.text.index("D Manager") < oldest.text.index("C Director")
+    assert oldest.text.index("Allentown, PA, US") < oldest.text.index("Boston, MA, US")
+    for path in ("/", "/jobs/filter"):
+        response = client.get(path, params=query)
+        assert response.status_code == 200
+        assert response.text.index("A Director") < response.text.index("B Manager")
+        assert response.text.count(f'id="job-{jobs[0].id}"') == 1
+    assert "<html" not in hx.text.lower()
+    assert client.get("/jobs/filter?profile_id=abc").status_code == 422
+    csv_response = client.get("/jobs/export", params=[*query, ("format", "csv")])
+    json_response = client.get("/jobs/export", params=[*query, ("format", "json")])
+    expected = [job.title for job in jobs]
+    assert [row["Title"] for row in csv.DictReader(io.StringIO(csv_response.text))] == expected
+    assert [row["Title"] for row in json.loads(json_response.text)] == expected
+
+
+def test_salary_multiselect_respects_unspecified_toggle(client, db_session):
+    jobs = [
+        SavedJob(job_id=f"sal-{n}", title=f"Salary {n}", salary_bracket=bracket)
+        for n, bracket in enumerate(("$120k - $160k", "$160k - $200k", "Unspecified"))
+    ]
+    db_session.add_all(jobs)
+    db_session.commit()
+    params = [
+        ("salary_bracket", "$120k - $160k"),
+        ("salary_bracket", "$160k - $200k"),
+        ("include_unspecified", "false"),
+    ]
+    response = client.get("/jobs/filter", params=params, headers={"HX-Request": "true"})
+    assert [
+        int(num)
+        for num in re.findall(r'class="job-card glass-panel" id="job-(\d+)"', response.text)
+    ] == [jobs[1].id, jobs[0].id]
+    response = client.get(
+        "/jobs/filter",
+        params=[*params, ("include_unspecified", "true")],
+        headers={"HX-Request": "true"},
+    )
+    assert f'id="job-{jobs[2].id}"' in response.text
+    response = client.get(
+        "/jobs/filter",
+        params=[("salary_bracket", "Unspecified"), ("include_unspecified", "false")],
+        headers={"HX-Request": "true"},
+    )
+    assert f'id="job-{jobs[2].id}"' in response.text
+    assert f'id="job-{jobs[0].id}"' not in response.text

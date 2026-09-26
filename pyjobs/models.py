@@ -2,7 +2,17 @@ from __future__ import annotations
 
 import datetime
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from pyjobs.database import Base
@@ -20,6 +30,44 @@ class UserPreference(Base):
     candidate_name: Mapped[str] = mapped_column(String, default="")
     resume_filename_pattern: Mapped[str] = mapped_column(String, default="{name} {date}.{ext}")
     resume_date_format: Mapped[str] = mapped_column(String, default="%m-%d-%Y")
+    home_location: Mapped[str] = mapped_column(String, default="")
+
+
+class Company(Base):
+    """A normalized company identity observed in saved postings or applications."""
+
+    __tablename__ = "companies"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String, default="")
+    name_key: Mapped[str] = mapped_column(String, unique=True)
+
+    sites: Mapped[list[CompanySite]] = relationship(
+        back_populates="company",
+        cascade="all, delete-orphan",
+        order_by="CompanySite.location",
+    )
+    saved_jobs: Mapped[list[SavedJob]] = relationship(back_populates="company_profile")
+    applications: Mapped[list[JobApplication]] = relationship(back_populates="company_profile")
+
+
+class CompanySite(Base):
+    """A physical work location observed for a company."""
+
+    __tablename__ = "company_sites"
+    __table_args__ = (
+        UniqueConstraint("company_id", "location_key", name="uq_company_site_location"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    company_id: Mapped[int] = mapped_column(
+        ForeignKey("companies.id", ondelete="CASCADE"), index=True
+    )
+    location: Mapped[str] = mapped_column(String)
+    location_key: Mapped[str] = mapped_column(String)
+    address: Mapped[str] = mapped_column(String, default="")
+
+    company: Mapped[Company] = relationship(back_populates="sites")
 
 
 class SearchProfile(Base):
@@ -88,6 +136,9 @@ class SavedJob(Base):
     site: Mapped[str] = mapped_column(String, default="")
     title: Mapped[str] = mapped_column(String, default="")
     company: Mapped[str] = mapped_column(String, default="")
+    company_id: Mapped[int | None] = mapped_column(
+        ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, default=None, index=True
+    )
     location: Mapped[str] = mapped_column(String, default="")
     salary_source: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
     min_salary: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
@@ -110,6 +161,8 @@ class SavedJob(Base):
         DateTime, default=lambda: datetime.datetime.now(datetime.UTC)
     )
 
+    company_profile: Mapped[Company | None] = relationship(back_populates="saved_jobs")
+
     applications: Mapped[list[JobApplication]] = relationship(
         back_populates="saved_job", cascade="all, delete-orphan"
     )
@@ -130,6 +183,9 @@ class JobApplication(Base):
     )
     title: Mapped[str] = mapped_column(String, default="")
     company: Mapped[str] = mapped_column(String, default="", index=True)
+    company_id: Mapped[int | None] = mapped_column(
+        ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, default=None, index=True
+    )
     location: Mapped[str] = mapped_column(String, default="")
     salary_stated: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
     job_url: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
@@ -166,6 +222,7 @@ class JobApplication(Base):
         index=True,
     )
 
+    company_profile: Mapped[Company | None] = relationship(back_populates="applications")
     saved_job: Mapped[SavedJob | None] = relationship(back_populates="applications")
     resume_version: Mapped[ResumeVersion | None] = relationship(back_populates="applications")
     contacts: Mapped[list[ApplicationContact]] = relationship(

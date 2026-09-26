@@ -57,7 +57,9 @@
         </button>
       </div>
       <h3 class="detail-company">
-        {{ application.company }} {% if application.location %}
+        {% if application.company_id %}<a href="/companies/{{ application.company_id }}"
+          >{{ application.company }}</a
+        >{% else %}{{ application.company }}{% endif %} {% if application.location %}
         <span class="detail-location">· 📍 {{ application.location }}</span>
         {% endif %}
       </h3>
