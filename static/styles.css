@@ -2626,6 +2626,64 @@ dialog.resume-viewer-dialog {
   gap: 1rem;
 }
 
+.company-profile-card,
+.company-profile-card:visited {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  transition:
+    background 0.2s,
+    border-color 0.2s,
+    transform 0.2s;
+}
+
+.company-profile-card:hover,
+.company-profile-card:focus-visible {
+  border-color: rgba(56, 189, 248, 0.65);
+  background: rgba(59, 130, 246, 0.12);
+  transform: translateY(-2px);
+}
+
+.company-profile-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #bae6fd;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.company-site-count {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.company-site-action,
+.company-site-action:visited {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.25rem 0 0.5rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid rgba(59, 130, 246, 0.45);
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.12);
+  color: #bfdbfe;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.company-site-action:hover,
+.company-site-action:focus-visible {
+  border-color: #60a5fa;
+  background: rgba(59, 130, 246, 0.24);
+  color: #eff6ff;
+  text-decoration: none;
+}
+
 .company-form {
   display: grid;
   gap: 0.6rem;
@@ -2643,4 +2701,19 @@ dialog.resume-viewer-dialog {
 .company-related {
   border-top: 1px solid var(--border-color);
   padding-top: 1rem;
+}
+
+.company-related-section + .company-related-section {
+  margin-top: 1.75rem;
+}
+
+.company-application-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 1rem;
+}
+
+.company-application-list .kanban-card {
+  cursor: default;
+  user-select: text;
 }

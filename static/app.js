@@ -57,7 +57,7 @@ window.closeJobDetails = (jobId) => {
 
   document.addEventListener("dragstart", (e) => {
     const card = e.target.closest(".kanban-card");
-    if (!card) return;
+    if (!card?.draggable) return;
 
     draggedCard = card;
     window.isDraggingCard = true;

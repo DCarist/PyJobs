@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import datetime
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from pyjobs.dependencies import get_db, templates
+from pyjobs.dependencies import get_db, get_tracked_applications_map, templates
 from pyjobs.models import Company, CompanySite, UserPreference
 from pyjobs.services.companies import get_or_create_company_site, is_valid_company_name
 
@@ -73,6 +74,8 @@ async def company_detail(request: Request, company_id: int, db: Session = Depend
             "company": company,
             "home_location": home,
             "directions": directions,
+            "tracked_map": get_tracked_applications_map(db),
+            "today": datetime.date.today(),
             "active_page": "companies",
         },
     )

@@ -160,6 +160,7 @@ set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
 * Scraped placeholder values such as `none` do not create company profiles. When the scraped name is missing, only explicit `Company:` or `Employer:` lines in the description are used; otherwise the posting stays unidentified for manual correction. A saved company name is retained across later scrapes.
 * Edit or add a site's street address on its profile. Observed city labels do not supply an assumed street address, and removing a posting does not remove its historical work site.
 * Save a separate home starting location on the Companies page. This does not change your search-profile target or the legacy search preference. Driving-directions links open Google Maps only when clicked; city-only destinations are marked **Approximate (city center)**. No Maps API key or geocoding is needed.
+* Company directory cards link to each profile. Profiles show related postings with the regular feed cards and tracked applications with the tracker cards (without drag-and-drop outside the tracker). Sites show a **Set home location** action when directions have no starting point.
 
 ---
 

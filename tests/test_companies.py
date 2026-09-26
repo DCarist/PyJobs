@@ -359,7 +359,7 @@ def test_company_directory_sites_directions_and_home_origin(client, db_session):
     assert 'value=""' in directory.text
     no_origin = client.get(f"/companies/{company.id}")
     assert "Approximate (city center)" in " ".join(no_origin.text.split())
-    assert "Set your starting location for directions" in no_origin.text
+    assert 'href="/companies#home-location"' in no_origin.text
     assert "maps/dir/" not in no_origin.text
     assert "No physical sites observed" in client.get(f"/companies/{remote.id}").text
 
@@ -636,3 +636,44 @@ def test_placeholder_company_profiles_are_not_offered_as_employers(client, db_se
     directory = client.get("/companies")
     assert f'href="/companies/{legacy.id}"' not in directory.text
     assert client.get(f"/companies/{legacy.id}").status_code == 404
+
+
+def test_company_profile_shows_feed_jobs_and_tracker_applications(client, db_session):
+    company, _ = get_or_create_company_site(db_session, "Atlas Labs", "Austin, TX")
+    assert company is not None
+    db_session.flush()
+    job = SavedJob(
+        job_id="atlas-posting",
+        title="Research Engineer",
+        company=company.name,
+        company_id=company.id,
+        location="Austin, TX",
+        site="linkedin",
+    )
+    application = JobApplication(
+        saved_job=job,
+        title=job.title,
+        company=company.name,
+        company_id=company.id,
+        location=job.location,
+        status="applied",
+        method="Company Website",
+    )
+    db_session.add_all([job, application])
+    db_session.commit()
+
+    directory = client.get("/companies")
+    assert f'href="/companies/{company.id}"' in directory.text
+    detail = client.get(f"/companies/{company.id}")
+    assert detail.status_code == 200
+    assert f'id="job-{job.id}"' in detail.text
+    assert f'href="/companies/{company.id}"' in detail.text
+    assert f'id="app-card-{application.id}"' in detail.text
+    assert f'href="/applications/{application.id}"' in detail.text
+    company_card = re.search(rf'<div\b[^>]*id="app-card-{application.id}"[^>]*>', detail.text)
+    assert company_card is not None and 'draggable="false"' in company_card.group()
+
+    tracker = client.get("/applications?view=kanban")
+    assert tracker.status_code == 200
+    tracker_card = re.search(rf'<div\b[^>]*id="app-card-{application.id}"[^>]*>', tracker.text)
+    assert tracker_card is not None and 'draggable="true"' in tracker_card.group()

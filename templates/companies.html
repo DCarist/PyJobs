@@ -26,12 +26,18 @@
   <section aria-labelledby="company-list-heading">
     <h3 id="company-list-heading">Company profiles</h3>
     {% if companies %}
-    <div class="company-list">
+    <div class="company-list company-directory-list">
       {% for company in companies %}
-      <article class="glass-panel company-panel">
-        <a href="/companies/{{ company.id }}">{{ company.name }}</a>
-        <p class="section-subtitle">{{ company.sites|length }} physical work sites</p>
-      </article>
+      <a class="glass-panel company-panel company-profile-card" href="/companies/{{ company.id }}">
+        <span class="company-profile-name">
+          <span aria-hidden="true">🏢</span>
+          {{ company.name }}
+        </span>
+        <span class="company-site-count">
+          {{ company.sites|length }} physical work {% if company.sites|length == 1 %}site{% else
+          %}sites{% endif %}
+        </span>
+      </a>
       {% endfor %}
     </div>
     {% else %}

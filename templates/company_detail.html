@@ -24,11 +24,15 @@
           href="{{ directions[site.id] }}"
           target="_blank"
           rel="noopener noreferrer"
-          class="external-link"
-          >Driving directions{% if not site.address %} · Approximate (city center){% endif %} ↗</a
+          class="company-site-action"
+          >Driving directions{% if not site.address %} · Approximate (city center){% endif %}
+          <span aria-hidden="true">↗</span></a
         >
         {% else %}
-        <a href="/companies#home-location">Set your starting location for directions</a>
+        <a href="/companies#home-location" class="company-site-action">
+          <span aria-hidden="true">🏠</span>
+          Set home location
+        </a>
         {% endif %}
         <form
           method="post"
@@ -71,29 +75,24 @@
     </div>
   </section>
   <section class="company-related" aria-labelledby="company-jobs-heading">
-    <h3 id="company-jobs-heading">Saved postings</h3>
-    {% if company.saved_jobs %}
-    <ul>
-      {% for job in company.saved_jobs %}
-      <li><a href="/#job-{{ job.id }}">{{ job.title }}</a> · {{ job.location }}</li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <p>No saved postings linked.</p>
-    {% endif %}
-    <h3>Tracked applications</h3>
-    {% if company.applications %}
-    <ul>
-      {% for application in company.applications %}
-      <li>
-        <a href="/applications/{{ application.id }}">{{ application.title }}</a>
-        · {{ application.location }}
-      </li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <p>No tracked applications linked.</p>
-    {% endif %}
+    <div class="company-related-section">
+      <h3 id="company-jobs-heading">Saved postings</h3>
+      {% if company.saved_jobs %} {% set jobs = company.saved_jobs %} {% set group_by = "none" %} {%
+      include "partials/job_results.html" %} {% else %}
+      <p>No saved postings linked.</p>
+      {% endif %}
+    </div>
+    <div class="company-related-section">
+      <h3 id="company-applications-heading">Tracked applications</h3>
+      {% if company.applications %}
+      <div class="company-application-list">
+        {% set company_profile_view = true %} {% for app in company.applications %} {% include
+        "partials/application_card.html" %} {% endfor %}
+      </div>
+      {% else %}
+      <p>No tracked applications linked.</p>
+      {% endif %}
+    </div>
   </section>
 </section>
 {% endblock %}
