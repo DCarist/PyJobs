@@ -149,12 +149,15 @@ set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
 
 ### Curated Feed Filters & Grouping
 * Seniority, salary bracket, source board, and discovery profile support multiple selections within each filter. Selected values match any option within that filter; filters combine across categories. An empty selection means all.
+* The multi-select filters open styled checkbox menus matching the other dropdown controls.
 * Salary brackets can include unspecified postings with the separate toggle; explicitly selecting Unspecified remains effective when that toggle is off.
 * Filter selections, sorting, and grouping live in the URL. Reloading a filtered URL restores the controls and server-rendered results; CSV, Excel, and JSON exports use the same filters and posting order.
 * Location grouping merges equivalent US city/state labels (for example, `Allentown, PA` and `Allentown, PA, US`). Group headings stay alphabetical; Sort By orders postings within each group.
 
 ### Company Profiles & Directions (`/companies`)
 * Company profiles are built from saved postings and tracked applications, merging case-insensitive company names and observed physical work sites. Remote-only employers have no physical sites until one is entered.
+* Job cards show an office-icon company pill linked to its profile. If the scraper cannot identify an employer, use **Set company** on the card or the Company field in Posting Details; corrections update linked tracked applications and refresh the filtered feed.
+* Scraped placeholder values such as `none` do not create company profiles. When the scraped name is missing, only explicit `Company:` or `Employer:` lines in the description are used; otherwise the posting stays unidentified for manual correction. A saved company name is retained across later scrapes.
 * Edit or add a site's street address on its profile. Observed city labels do not supply an assumed street address, and removing a posting does not remove its historical work site.
 * Save a separate home starting location on the Companies page. This does not change your search-profile target or the legacy search preference. Driving-directions links open Google Maps only when clicked; city-only destinations are marked **Approximate (city center)**. No Maps API key or geocoding is needed.
 

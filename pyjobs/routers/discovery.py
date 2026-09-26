@@ -23,7 +23,11 @@ from pyjobs.models import (
     SearchProfile,
     UserPreference,
 )
-from pyjobs.services.companies import get_or_create_company_site
+from pyjobs.services.companies import (
+    company_name_from_scrape,
+    get_or_create_company_site,
+    normalize_company_name,
+)
 from pyjobs.services.scraper import fetch_jobs
 from pyjobs.services.task_manager import get_task, launch_scrape_task
 
@@ -211,10 +215,15 @@ async def search_jobs(request: Request, db: Session = Depends(get_db)):
             continue
 
         existing_job = db.query(SavedJob).filter(SavedJob.job_id == j["job_id"]).first()
-        observed_company = j.get("company") or (existing_job.company if existing_job else "")
+        scraped_company = company_name_from_scrape(j.get("company"), j.get("description"))
+        observed_company = (
+            normalize_company_name(existing_job.company) if existing_job else None
+        ) or scraped_company
         observed_location = j.get("location") or (existing_job.location if existing_job else "")
         try:
-            company_record, _ = get_or_create_company_site(db, observed_company, observed_location)
+            company_record, _ = get_or_create_company_site(
+                db, observed_company or "", observed_location
+            )
             db.flush()
         except IntegrityError:
             db.rollback()
@@ -231,7 +240,7 @@ async def search_jobs(request: Request, db: Session = Depends(get_db)):
                 job_id=str(j["job_id"]),
                 site=j.get("site", ""),
                 title=j.get("title", ""),
-                company=j.get("company", ""),
+                company=observed_company or "",
                 location=j.get("location", ""),
                 company_id=company_record.id if company_record else None,
                 salary_source=j.get("salary_source"),
@@ -248,8 +257,7 @@ async def search_jobs(request: Request, db: Session = Depends(get_db)):
             db.add(new_job)
         else:
             existing_job.company_id = company_record.id if company_record else None
-            if j.get("company"):
-                existing_job.company = j["company"]
+            existing_job.company = observed_company or ""
             if j.get("location"):
                 existing_job.location = j["location"]
             # Refresh classification and salary metadata on existing job

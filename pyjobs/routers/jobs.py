@@ -4,8 +4,8 @@ import datetime
 import io
 
 import pandas as pd
-from fastapi import APIRouter, Depends, Query, Request, Response
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, Form, Query, Request, Response
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from pyjobs.dependencies import (
@@ -185,6 +185,46 @@ async def get_job_detail(request: Request, id: int, db: Session = Depends(get_db
     return templates.TemplateResponse(
         request=request, name="partials/job_detail.html", context={"job": job}
     )
+
+
+@router.post("/job/{id}/company", response_class=HTMLResponse)
+async def update_job_company(
+    request: Request,
+    id: int,
+    company: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    job = db.query(SavedJob).filter(SavedJob.id == id).first()
+    if job is None:
+        return HTMLResponse("Job not found.", status_code=404)
+
+    company_record, _ = get_or_create_company_site(db, company, job.location)
+    if company_record is None:
+        if request.headers.get("HX-Request") != "true":
+            return HTMLResponse("Enter a valid company name.", status_code=422)
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/job_detail.html",
+            context={"job": job, "company_error": "Enter a valid company name."},
+        )
+
+    db.flush()
+    job.company = company_record.name
+    job.company_id = company_record.id
+    for application in job.applications:
+        application.company = job.company
+        application.company_id = job.company_id
+    db.commit()
+
+    if request.headers.get("HX-Request") == "true":
+        response = templates.TemplateResponse(
+            request=request,
+            name="partials/job_detail.html",
+            context={"job": job},
+        )
+        response.headers["HX-Trigger-After-Swap"] = "companyUpdated"
+        return response
+    return RedirectResponse(url=f"/#job-{id}", status_code=303)
 
 
 @router.post("/job/{id}/hide", response_class=HTMLResponse)

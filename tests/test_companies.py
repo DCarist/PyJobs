@@ -559,3 +559,80 @@ def test_local_scrape_to_directions_and_filtered_export(client, db_session):
     assert 'class="group-title">Allentown, PA, US' in filtered.text
     exported = client.get("/jobs/export", params=[*filters, ("format", "json")])
     assert [row["Title"] for row in json.loads(exported.text)] == ["Lead Engineer"]
+
+
+def test_job_company_correction_updates_card_company_and_tracked_application(client, db_session):
+    job = SavedJob(
+        job_id="missing-employer",
+        title="Engineer",
+        company="none",
+        location="Allentown, PA",
+        description="Engineer role with an unlisted employer.",
+    )
+    application = JobApplication(saved_job=job, title=job.title, company=job.company)
+    db_session.add_all([job, application])
+    db_session.commit()
+
+    feed = client.get("/")
+    assert "Company not identified" in feed.text
+    assert "Set company" in feed.text
+    detail = client.get(f"/job/{job.id}")
+    assert 'name="company"' in detail.text
+    assert job.description in detail.text
+
+    invalid = client.post(
+        f"/job/{job.id}/company",
+        data={"company": "none"},
+        headers={"HX-Request": "true"},
+    )
+    assert "Enter a valid company name." in invalid.text
+    db_session.refresh(job)
+    assert job.company_id is None
+
+    corrected = client.post(
+        f"/job/{job.id}/company",
+        data={"company": "  Example   Works  "},
+        headers={"HX-Request": "true"},
+    )
+    assert corrected.status_code == 200
+    assert corrected.headers["HX-Trigger-After-Swap"] == "companyUpdated"
+    db_session.refresh(job)
+    db_session.refresh(application)
+    company = db_session.query(Company).filter_by(name_key="example works").one()
+    assert job.company == application.company == company.name == "Example Works"
+    assert job.company_id == application.company_id == company.id
+    assert [(site.location, site.address) for site in company.sites] == [("Allentown, PA, US", "")]
+    assert 'value="Example Works"' in corrected.text
+
+    grouped = client.get("/jobs/filter?group_by=company", headers={"HX-Request": "true"})
+    assert "Example Works" in grouped.text
+    assert f'href="/companies/{company.id}"' in grouped.text
+    assert "Company not identified" not in grouped.text
+
+
+def test_job_company_correction_redirects_without_htmx_and_404s(client, db_session):
+    job = SavedJob(job_id="unlinked-employer", title="Analyst", company="none")
+    db_session.add(job)
+    db_session.commit()
+    response = client.post(
+        f"/job/{job.id}/company",
+        data={"company": "Corrected Employer"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/#job-{job.id}"
+    db_session.refresh(job)
+    assert job.company_id is not None
+
+    missing = client.post("/job/999999/company", data={"company": "Example"})
+    assert missing.status_code == 404
+
+
+def test_placeholder_company_profiles_are_not_offered_as_employers(client, db_session):
+    legacy = Company(name="none", name_key="none")
+    db_session.add(legacy)
+    db_session.commit()
+
+    directory = client.get("/companies")
+    assert f'href="/companies/{legacy.id}"' not in directory.text
+    assert client.get(f"/companies/{legacy.id}").status_code == 404

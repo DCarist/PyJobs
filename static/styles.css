@@ -232,6 +232,41 @@ a.btn-secondary:hover {
   margin: 0;
 }
 
+.job-company .company-badge {
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.12);
+  color: #bae6fd;
+  font-size: 0.82rem;
+  text-decoration: none;
+}
+
+.job-company a.company-badge:visited {
+  color: #bae6fd;
+}
+
+.job-company a.company-badge:hover,
+.job-company a.company-badge:focus-visible {
+  background: rgba(56, 189, 248, 0.23);
+  border-color: #38bdf8;
+  text-decoration: none;
+}
+
+.company-edit-prompt {
+  margin-left: 0.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #93c5fd;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.company-edit-prompt:hover,
+.company-edit-prompt:focus-visible {
+  text-decoration: underline;
+}
+
 .job-meta {
   display: flex;
   flex-wrap: wrap;
@@ -375,6 +410,19 @@ a.btn-secondary:hover {
   margin-bottom: 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
+.job-details-header .btn-subtle {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.job-details-header .btn-subtle:hover,
+.job-details-header .btn-subtle:focus-visible {
+  border-color: var(--primary);
+  color: var(--text-primary);
+}
 
 .details-heading {
   font-size: 0.95rem;
@@ -382,6 +430,32 @@ a.btn-secondary:hover {
   color: var(--text-primary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.job-company-form {
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.job-company-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.job-company-form-row input {
+  flex: 1 1 15rem;
+}
+
+.job-company-form-row button {
+  width: auto;
+}
+
+.company-form-error {
+  margin: 0.6rem 0 0;
+  color: #fca5a5;
 }
 
 .no-description {
@@ -706,7 +780,7 @@ a.btn-secondary:hover {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  min-height: 2.2rem;
+  min-height: 2.35rem;
   padding: 0.55rem 0.75rem;
   border: 1px solid var(--border-color);
   border-radius: 8px;
@@ -716,6 +790,12 @@ a.btn-secondary:hover {
   line-height: 1.2;
   cursor: pointer;
   list-style: none;
+}
+
+.curation-dropdown > summary:hover,
+.curation-dropdown[open] > summary {
+  border-color: rgba(59, 130, 246, 0.55);
+  background: rgba(30, 41, 59, 0.8);
 }
 
 .curation-dropdown > summary::-webkit-details-marker {
@@ -772,6 +852,12 @@ a.btn-secondary:hover {
 
 .curation-dropdown-menu label:hover {
   background: rgba(255, 255, 255, 0.08);
+}
+
+.curation-dropdown-menu label:focus-within {
+  background: rgba(59, 130, 246, 0.16);
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
 }
 
 .curation-dropdown-menu input[type="checkbox"] {

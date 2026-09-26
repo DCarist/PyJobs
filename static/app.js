@@ -20,6 +20,7 @@ window.toggleJobDetails = (jobId) => {
       })
       .then((html) => {
         container.innerHTML = html;
+        window.htmx?.process(container);
         container.dataset.open = "true";
         if (btn) {
           btn.textContent = "Hide Details";
@@ -523,6 +524,11 @@ document.addEventListener("htmx:afterSwap", (evt) => {
     toast.style.zIndex = "999999";
     toast.style.pointerEvents = "none";
   }
+});
+
+document.addEventListener("companyUpdated", () => {
+  const form = document.getElementById("curation-form");
+  if (form && window.htmx) window.htmx.trigger(form, "change");
 });
 
 document.addEventListener("click", (e) => {

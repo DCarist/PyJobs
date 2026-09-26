@@ -1,0 +1,12 @@
+<p class="job-company" id="job-company-{{ job.id }}">
+  {% if job.company_id %}
+  <a class="badge company-badge" href="/companies/{{ job.company_id }}"
+    ><span aria-hidden="true">🏢</span>{{ job.company }}</a
+  >
+  {% else %}
+  <span class="badge company-badge"><span aria-hidden="true">🏢</span>Company not identified</span>
+  <button type="button" class="company-edit-prompt" onclick="toggleJobDetails('{{ job.id }}')">
+    Set company
+  </button>
+  {% endif %}
+</p>

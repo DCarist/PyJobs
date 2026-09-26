@@ -8,14 +8,14 @@ from sqlalchemy.orm import Session
 
 from pyjobs.dependencies import get_db, templates
 from pyjobs.models import Company, CompanySite, UserPreference
-from pyjobs.services.companies import get_or_create_company_site
+from pyjobs.services.companies import get_or_create_company_site, is_valid_company_name
 
 router = APIRouter()
 
 
 def _company_or_404(db: Session, company_id: int) -> Company:
     company = db.get(Company, company_id)
-    if company is None:
+    if company is None or not is_valid_company_name(company.name):
         raise HTTPException(status_code=404, detail="Company not found")
     return company
 
@@ -28,7 +28,11 @@ def _directions(origin: str, destination: str) -> str:
 
 @router.get("/companies", response_class=HTMLResponse)
 async def company_directory(request: Request, db: Session = Depends(get_db)):
-    companies = db.query(Company).order_by(Company.name.asc()).all()
+    companies = [
+        company
+        for company in db.query(Company).order_by(Company.name.asc()).all()
+        if is_valid_company_name(company.name)
+    ]
     preference = db.query(UserPreference).first()
     return templates.TemplateResponse(
         request=request,
