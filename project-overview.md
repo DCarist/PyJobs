@@ -1,12 +1,12 @@
 # PyJobs: Project Overview & Workspace Blueprint
 
-## 1. Totality Review of PyJobs (v0.2.0)
+## 1. Totality Review of PyJobs (v0.2.1)
 
 ### 1.1 Architecture & Stack Overview
 PyJobs is a lightweight, full-stack Python web application designed for intelligent job scraping, curation, and management:
 
 * **Backend Framework**: **FastAPI** (`>=0.136.0`) with **Uvicorn** (`>=0.44.0`), running on Python 3.14 managed by **uv** (`0.11.21`).
-* **Package Architecture**: Organized under `pyjobs/` with modular controllers (`pyjobs.routers`), services (`pyjobs.services`), centralized dependencies (`pyjobs.dependencies`), and declarative ORM layer (`pyjobs.database`, `pyjobs.models`).
+* **Package Architecture**: Organized under `pyjobs/` with modular controllers (`pyjobs.routers`), services (`pyjobs.services`), centralized dependencies (`pyjobs.dependencies`), and declarative ORM layer (`pyjobs.database`, `pyjobs.models`). Built via PEP 517 build backend (`hatchling`).
 * **Database & ORM**: **SQLite** (`pyjobs.db`) managed via **SQLAlchemy** (`>=2.0.49`) with declarative `Mapped[T]` annotations.
 * **Frontend**: Server-rendered **Jinja2** templates (`templates/`) powered by **HTMX** (`1.9.10`) for dynamic, SPA-like partial DOM updates without full page reloads.
 * **Styling**: Custom modern Vanilla CSS (`static/styles.css`) featuring a sleek dark-mode glassmorphic design system.
@@ -29,7 +29,7 @@ graph TD
 ```
 
 #### Package Structure (`pyjobs/`)
-* **`pyjobs.main`**: Slim application orchestrator (~50 lines) initializing FastAPI `v0.2.0`, lifespan scheduler, static asset mounting, and router registration.
+* **`pyjobs.main`**: Slim application orchestrator (~50 lines) initializing FastAPI `v0.2.1`, lifespan scheduler, static asset mounting, and router registration.
 * **`pyjobs.routers`**:
   * `discovery.py`: Discovery feed (`GET /`), preferences (`POST /preferences`), quick search (`POST /search`), and scrape endpoints (`POST /scrape/start`, `GET /scrape/status/{task_id}`).
   * `jobs.py`: Filter jobs (`GET /jobs/filter`), multi-format export (`GET /jobs/export`), staleness management, job drawer, hide/unhide, and 1-click tracking (`POST /job/{id}/track`).

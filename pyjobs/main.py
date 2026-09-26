@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
         stop_scheduler()
 
 
-app = FastAPI(title="PyJobs", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="PyJobs", version="0.2.1", lifespan=lifespan)
 
 # Ensure required directories exist
 (TEMPLATES_DIR / "partials").mkdir(parents=True, exist_ok=True)

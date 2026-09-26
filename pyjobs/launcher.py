@@ -6,6 +6,7 @@ import socket
 import sys
 import threading
 import time
+import urllib.parse
 import webbrowser
 
 import uvicorn
@@ -27,9 +28,39 @@ def get_local_ip() -> str:
     return ip
 
 
-def launch_browser(url: str, delay: float = 1.0) -> None:
-    """Waits briefly for the server to bind before opening the default browser."""
-    time.sleep(delay)
+def wait_for_server(
+    host: str,
+    port: int,
+    timeout: float = 10.0,
+    check_interval: float = 0.1,
+) -> bool:
+    """Polls server host and port until it accepts connections or times out."""
+    check_host = "127.0.0.1" if host in ("0.0.0.0", "localhost") else host
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        try:
+            with socket.create_connection((check_host, port), timeout=check_interval):
+                return True
+        except OSError, TimeoutError:
+            time.sleep(check_interval)
+    return False
+
+
+def launch_browser(
+    url: str,
+    delay: float = 0.0,
+    timeout: float = 10.0,
+    check_interval: float = 0.1,
+) -> None:
+    """Waits for the server to be actively listening before opening the default browser."""
+    if delay > 0:
+        time.sleep(delay)
+
+    parsed = urllib.parse.urlsplit(url)
+    host = parsed.hostname or "127.0.0.1"
+    port = parsed.port or 8000
+
+    wait_for_server(host, port, timeout=timeout, check_interval=check_interval)
     webbrowser.open(url)
 
 

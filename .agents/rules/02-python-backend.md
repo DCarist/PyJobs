@@ -30,13 +30,13 @@ Guidelines and constraints for all backend code in PyJobs.
 ---
 
 ## 3. FastAPI & Package Architecture
-* All application logic is packaged under `pyjobs/`:
+* All application logic is packaged under `pyjobs/` with a standard PEP 517 build backend (`hatchling`):
   * `pyjobs.main`: Thin FastAPI orchestrator, lifespan management, static mounting, and router registration.
   * `pyjobs.routers`: Route controllers (`discovery`, `jobs`, `profiles`, `applications`, `resumes`).
   * `pyjobs.services`: Background engines and parsers (`scraper`, `scheduler`, `task_manager`, `resume_parser`).
   * `pyjobs.dependencies`: Dependency injection (`get_db`, `templates`), path resolvers, and query helpers.
   * `pyjobs.database` & `pyjobs.models`: SQLAlchemy 2.0 ORM engine, declarative models, and schema migrations.
-  * `pyjobs.launcher`: Network-enabled server launcher wrapped by the root `run.py` shim.
+  * `pyjobs.launcher`: Network-enabled server launcher wrapped by the root `run.py` shim and `pyjobs` CLI entry point.
 * Validate all request inputs using Pydantic schemas or standard FastAPI parameters.
 * Return appropriate HTTP status codes (e.g. `201 Created`, `404 Not Found`, `422 Unprocessable Entity`).
 * Ensure background tasks and scraping operations do not block the event loop (run in worker threads via `asyncio.to_thread`).
