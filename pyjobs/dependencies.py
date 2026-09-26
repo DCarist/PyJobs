@@ -4,11 +4,12 @@ import datetime
 import os
 import re
 from collections.abc import Generator
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict
 
 import markdown
-from fastapi import FastAPI
+from fastapi import FastAPI, Query, Request
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -20,6 +21,7 @@ from pyjobs.models import (
     SavedJob,
     SearchProfile,
 )
+from pyjobs.services.locations import canonicalize_location
 from pyjobs.services.resume_parser import score_resume_match
 
 # Workspace directory paths
@@ -109,17 +111,83 @@ def get_week_ending(d: datetime.date) -> datetime.date:
     return d + datetime.timedelta(days=days_ahead)
 
 
+@dataclass
+class CurationFilters:
+    q: str
+    sort: str
+    seniority: list[str]
+    salary_bracket: list[str]
+    include_unspecified: bool
+    site: list[str]
+    date_range: str
+    show_hidden: bool
+    group_by: str
+    profile_id: list[int]
+    staleness: str
+    exclude_tracked: bool
+
+    def jobs(self, db: Session) -> list[SavedJob]:
+        return query_filtered_jobs(
+            db,
+            q=self.q,
+            sort=self.sort,
+            seniority=self.seniority,
+            salary_bracket=self.salary_bracket,
+            include_unspecified=self.include_unspecified,
+            site=self.site,
+            date_range=self.date_range,
+            show_hidden=self.show_hidden,
+            profile_id=self.profile_id,
+            staleness=self.staleness,
+            exclude_tracked=self.exclude_tracked,
+        )
+
+
+def get_curation_filters(
+    request: Request,
+    q: str = "",
+    sort: str = "newest",
+    seniority: list[str] = Query(default=[]),
+    salary_bracket: list[str] = Query(default=[]),
+    include_unspecified: bool = True,
+    site: list[str] = Query(default=[]),
+    date_range: str = "all",
+    show_hidden: bool = False,
+    group_by: str = "none",
+    profile_id: list[int] = Query(default=[]),
+    staleness: str = "all",
+    exclude_tracked: bool | None = None,
+) -> CurationFilters:
+    if exclude_tracked is None:
+        cookie = request.cookies.get("pyjobs_exclude_tracked", "")
+        exclude_tracked = cookie.lower() in ("true", "1")
+    return CurationFilters(
+        q,
+        sort,
+        seniority,
+        salary_bracket,
+        include_unspecified,
+        site,
+        date_range,
+        show_hidden,
+        group_by,
+        profile_id,
+        staleness,
+        exclude_tracked,
+    )
+
+
 def query_filtered_jobs(
     db: Session,
     q: str = "",
     sort: str = "newest",
-    seniority: str = "all",
-    salary_bracket: str = "all",
+    seniority: list[str] | None = None,
+    salary_bracket: list[str] | None = None,
     include_unspecified: bool = True,
-    site: str = "all",
+    site: list[str] | None = None,
     date_range: str = "all",
     show_hidden: bool = False,
-    profile_id: str | int = "all",
+    profile_id: list[int] | None = None,
     staleness: str = "all",
     exclude_tracked: bool = False,
 ) -> list[SavedJob]:
@@ -145,12 +213,8 @@ def query_filtered_jobs(
             ),
         )
 
-    if profile_id and str(profile_id) != "all":
-        try:
-            pid = int(profile_id)
-            query = query.filter(SavedJob.search_profiles.any(SearchProfile.id == pid))
-        except ValueError:
-            pass
+    if profile_id:
+        query = query.filter(SavedJob.search_profiles.any(SearchProfile.id.in_(profile_id)))
 
     if staleness == "active_only":
         query = query.filter(SavedJob.is_stale.is_(False))
@@ -168,22 +232,17 @@ def query_filtered_jobs(
             )
         )
 
-    if seniority and seniority != "all":
-        query = query.filter(SavedJob.seniority_level == seniority)
+    if seniority:
+        query = query.filter(SavedJob.seniority_level.in_(seniority))
 
-    if salary_bracket and salary_bracket != "all":
+    if salary_bracket:
+        selected = set(salary_bracket)
         if include_unspecified:
-            query = query.filter(
-                or_(
-                    SavedJob.salary_bracket == salary_bracket,
-                    SavedJob.salary_bracket == "Unspecified",
-                )
-            )
-        else:
-            query = query.filter(SavedJob.salary_bracket == salary_bracket)
+            selected.add("Unspecified")
+        query = query.filter(SavedJob.salary_bracket.in_(selected))
 
-    if site and site != "all":
-        query = query.filter(SavedJob.site == site)
+    if site:
+        query = query.filter(SavedJob.site.in_(site))
 
     if date_range and date_range != "all":
         now = datetime.datetime.now(datetime.UTC)
@@ -232,7 +291,7 @@ def group_jobs(jobs: list[SavedJob], group_by: str) -> dict[str, list[SavedJob]]
         if group_by == "company":
             key = job.company.strip() if job.company else "Unknown Company"
         elif group_by == "location":
-            key = job.location.strip() if job.location else "Unknown Location"
+            key = canonicalize_location(job.location or "") or "Unknown Location"
         elif group_by == "seniority":
             key = job.seniority_level or "Specialist / Contributor"
         elif group_by == "salary_bracket":

@@ -4,12 +4,14 @@ import datetime
 import io
 
 import pandas as pd
-from fastapi import APIRouter, Depends, Query, Request, Response
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, Form, Query, Request, Response
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from pyjobs.dependencies import (
+    CurationFilters,
     find_matching_resumes,
+    get_curation_filters,
     get_db,
     get_tracked_applications_map,
     group_jobs,
@@ -21,6 +23,8 @@ from pyjobs.models import (
     JobApplication,
     SavedJob,
 )
+from pyjobs.routers.discovery import render_index
+from pyjobs.services.companies import get_or_create_company_site
 from pyjobs.services.scraper import check_job_url_liveness, evaluate_job_staleness
 
 router = APIRouter()
@@ -29,51 +33,27 @@ router = APIRouter()
 @router.get("/jobs/filter", response_class=HTMLResponse)
 async def filter_jobs(
     request: Request,
-    q: str = "",
-    sort: str = "newest",
-    seniority: str = "all",
-    salary_bracket: str = "all",
-    include_unspecified: bool = True,
-    site: str = "all",
-    date_range: str = "all",
-    show_hidden: bool = False,
-    group_by: str = "none",
-    profile_id: str = "all",
-    staleness: str = "all",
-    exclude_tracked: bool = False,
+    filters: CurationFilters = Depends(get_curation_filters),
     db: Session = Depends(get_db),
 ):
-    jobs = query_filtered_jobs(
-        db=db,
-        q=q,
-        sort=sort,
-        seniority=seniority,
-        salary_bracket=salary_bracket,
-        include_unspecified=include_unspecified,
-        site=site,
-        date_range=date_range,
-        show_hidden=show_hidden,
-        profile_id=profile_id,
-        staleness=staleness,
-        exclude_tracked=exclude_tracked,
-    )
-    grouped = group_jobs(jobs, group_by=group_by)
-    tracked_map = get_tracked_applications_map(db)
+    if request.headers.get("HX-Request") != "true":
+        return render_index(request, db, filters)
+    jobs = filters.jobs(db)
     response = templates.TemplateResponse(
         request=request,
         name="partials/job_results.html",
         context={
             "jobs": jobs,
-            "grouped_jobs": grouped,
-            "group_by": group_by,
-            "show_hidden": show_hidden,
-            "tracked_map": tracked_map,
-            "exclude_tracked": exclude_tracked,
+            "grouped_jobs": group_jobs(jobs, group_by=filters.group_by),
+            "group_by": filters.group_by,
+            "show_hidden": filters.show_hidden,
+            "tracked_map": get_tracked_applications_map(db),
+            "exclude_tracked": filters.exclude_tracked,
         },
     )
     response.set_cookie(
         key="pyjobs_exclude_tracked",
-        value="true" if exclude_tracked else "false",
+        value="true" if filters.exclude_tracked else "false",
         max_age=31536000,
         samesite="lax",
         path="/",
@@ -83,41 +63,11 @@ async def filter_jobs(
 
 @router.get("/jobs/export")
 async def export_jobs(
-    request: Request,
     format: str = "csv",
-    q: str = "",
-    sort: str = "newest",
-    seniority: str = "all",
-    salary_bracket: str = "all",
-    include_unspecified: bool = True,
-    site: str = "all",
-    date_range: str = "all",
-    show_hidden: bool = False,
-    profile_id: str = "all",
-    staleness: str = "all",
-    exclude_tracked: bool | None = None,
+    filters: CurationFilters = Depends(get_curation_filters),
     db: Session = Depends(get_db),
 ):
-    if exclude_tracked is None:
-        cookie_val = request.cookies.get("pyjobs_exclude_tracked")
-        is_exclude_tracked = (cookie_val or "").lower() in ("true", "1")
-    else:
-        is_exclude_tracked = exclude_tracked
-
-    jobs = query_filtered_jobs(
-        db=db,
-        q=q,
-        sort=sort,
-        seniority=seniority,
-        salary_bracket=salary_bracket,
-        include_unspecified=include_unspecified,
-        site=site,
-        date_range=date_range,
-        show_hidden=show_hidden,
-        profile_id=profile_id,
-        staleness=staleness,
-        exclude_tracked=is_exclude_tracked,
-    )
+    jobs = filters.jobs(db)
 
     data = [
         {
@@ -237,6 +187,46 @@ async def get_job_detail(request: Request, id: int, db: Session = Depends(get_db
     )
 
 
+@router.post("/job/{id}/company", response_class=HTMLResponse)
+async def update_job_company(
+    request: Request,
+    id: int,
+    company: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    job = db.query(SavedJob).filter(SavedJob.id == id).first()
+    if job is None:
+        return HTMLResponse("Job not found.", status_code=404)
+
+    company_record, _ = get_or_create_company_site(db, company, job.location)
+    if company_record is None:
+        if request.headers.get("HX-Request") != "true":
+            return HTMLResponse("Enter a valid company name.", status_code=422)
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/job_detail.html",
+            context={"job": job, "company_error": "Enter a valid company name."},
+        )
+
+    db.flush()
+    job.company = company_record.name
+    job.company_id = company_record.id
+    for application in job.applications:
+        application.company = job.company
+        application.company_id = job.company_id
+    db.commit()
+
+    if request.headers.get("HX-Request") == "true":
+        response = templates.TemplateResponse(
+            request=request,
+            name="partials/job_detail.html",
+            context={"job": job},
+        )
+        response.headers["HX-Trigger-After-Swap"] = "companyUpdated"
+        return response
+    return RedirectResponse(url=f"/#job-{id}", status_code=303)
+
+
 @router.post("/job/{id}/hide", response_class=HTMLResponse)
 @router.delete("/job/{id}", response_class=HTMLResponse)
 async def hide_job(id: int, db: Session = Depends(get_db)):
@@ -272,6 +262,9 @@ async def track_job(
     if target_status not in ["saved", "applied"]:
         target_status = "applied"
 
+    company_record, _ = get_or_create_company_site(db, job.company, job.location)
+    db.flush()
+    job.company_id = company_record.id if company_record else None
     app_record = db.query(JobApplication).filter(JobApplication.saved_job_id == job.id).first()
     if not app_record:
         today = datetime.date.today()
@@ -292,6 +285,7 @@ async def track_job(
             title=job.title,
             company=job.company,
             location=job.location,
+            company_id=job.company_id,
             salary_stated=salary,
             job_url=job.job_url,
             description=job.description,
@@ -321,6 +315,7 @@ async def track_job(
         db.commit()
         db.refresh(app_record)
     else:
+        app_record.company_id = job.company_id
         # If already tracked as 'saved' and user clicks 'Track Application', upgrade to 'applied'
         if app_record.status == "saved" and target_status == "applied":
             today = datetime.date.today()
@@ -338,6 +333,9 @@ async def track_job(
             db.add(activity)
             db.commit()
             db.refresh(app_record)
+
+    if db.new or db.dirty:
+        db.commit()
 
     tracked_map = {job.id: app_record}
     return templates.TemplateResponse(

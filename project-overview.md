@@ -1,6 +1,6 @@
 # PyJobs: Project Overview & Workspace Blueprint
 
-## 1. Totality Review of PyJobs (v0.2.1)
+## 1. Totality Review of PyJobs (v0.2.2)
 
 ### 1.1 Architecture & Stack Overview
 PyJobs is a lightweight, full-stack Python web application designed for intelligent job scraping, curation, and management:
@@ -21,28 +21,30 @@ PyJobs is a lightweight, full-stack Python web application designed for intellig
 ```mermaid
 graph TD
     User([Browser Client]) <-->|HTTP / HTMX| FastAPI[FastAPI App: pyjobs.main]
-    FastAPI <-->|Routers| Routers[pyjobs.routers: discovery, jobs, profiles, applications, resumes]
+    FastAPI <-->|Routers| Routers[pyjobs.routers: discovery, jobs, profiles, applications, companies, resumes]
     FastAPI <-->|Jinja2 Templates| UI[templates/ & static/styles.css]
     FastAPI <-->|ORM / CRUD| DB[(SQLite: pyjobs.db via pyjobs.models)]
-    FastAPI -->|Services| Services[pyjobs.services: scraper, scheduler, task_manager, resume_parser]
+    FastAPI -->|Services| Services[pyjobs.services: scraper, scheduler, task_manager, companies, locations, resume_parser]
     Services -->|python-jobspy| Sites["Indeed / LinkedIn / ZipRecruiter / Glassdoor"]
 ```
 
 #### Package Structure (`pyjobs/`)
-* **`pyjobs.main`**: Slim application orchestrator (~50 lines) initializing FastAPI `v0.2.1`, lifespan scheduler, static asset mounting, and router registration.
+* **`pyjobs.main`**: Slim application orchestrator (~50 lines) initializing FastAPI `v0.2.2`, lifespan scheduler, static asset mounting, and router registration.
 * **`pyjobs.routers`**:
   * `discovery.py`: Discovery feed (`GET /`), preferences (`POST /preferences`), quick search (`POST /search`), and scrape endpoints (`POST /scrape/start`, `GET /scrape/status/{task_id}`).
   * `jobs.py`: Filter jobs (`GET /jobs/filter`), multi-format export (`GET /jobs/export`), staleness management, job drawer, hide/unhide, and 1-click tracking (`POST /job/{id}/track`).
   * `profiles.py`: Search profiles management (`GET /profiles/sidebar`, `POST /profiles`, `POST /profiles/{id}`, `DELETE /profiles/{id}`).
   * `applications.py`: Applications dashboard (Kanban & Table), detail command center, contacts CRUD, activity timeline, and certified unemployment reporting.
   * `resumes.py`: Resumes dashboard, versions management, in-browser PDF viewing, templated file downloads, and candidate settings.
+  * `companies.py`: Company directory, home-origin preference, physical-site address editing, and directions links.
 * **`pyjobs.services`**:
   * `scraper.py`: JobSpy scraping engine, location parsing, deduplication, seniority classification, and staleness evaluation.
   * `scheduler.py`: Background recurring scan scheduler loop.
   * `task_manager.py`: In-memory background task tracking and worker thread coordination.
   * `resume_parser.py`: PDF/DOCX text extraction, Word compilation, scoring, and filename templating.
+  * `companies.py` / `locations.py`: Normalized company/site identity and US city/state canonicalization.
 * **`pyjobs.database`**: SQLite engine, DeclarativeBase, session factory, and automatic incremental schema migrations.
-* **`pyjobs.models`**: SQLAlchemy 2.0 declarative models (`UserPreference`, `SearchProfile`, `JobSearchProfile`, `SavedJob`, `JobApplication`, `ApplicationContact`, `ApplicationActivity`, `Resume`, `ResumeVersion`).
+* **`pyjobs.models`**: SQLAlchemy 2.0 declarative models (`UserPreference`, `SearchProfile`, `JobSearchProfile`, `SavedJob`, `Company`, `CompanySite`, `JobApplication`, `ApplicationContact`, `ApplicationActivity`, `Resume`, `ResumeVersion`).
 * **`pyjobs.dependencies`**: Dependency injection (`get_db`, `templates`), path resolvers (`get_upload_dir`), and shared query helpers.
 * **`pyjobs.launcher`**: Network-enabled server launcher with local IP detection and browser spawning, wrapped by root `run.py`.
 
@@ -56,7 +58,7 @@ graph TD
 | **`ruff format --check .`** | **0 errors** | 100% formatted. |
 | **`ty check .`** | **0 diagnostics** | Full SQLAlchemy 2.0 `Mapped[T]` and TypedDict type safety. |
 | **`biome check`** | **0 errors** | Biome-compliant HTML, CSS, and JS with explicit `type="button"` attributes. |
-| **`pytest`** | **80 passing** | Sub-second hermetic test suite across `test_applications.py`, `test_curation.py`, `test_hooks.py`, `test_launcher.py`, `test_resumes.py`, `test_routes.py`, `test_scheduler.py`, `test_scraper.py`, `test_search_profiles.py`. |
+| **`pytest`** | **107 passing** | Hermetic tests include company migrations, multi-select curation, and browser-independent route behavior. |
 | **Git Branches** | **Standardized** | Feature workflow branching from `main` / `dev`. |
 
 ---

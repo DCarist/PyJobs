@@ -1,6 +1,6 @@
 <div class="job-details-panel glass-panel">
   <div class="job-details-header">
-    <span class="details-heading">Role Description</span>
+    <span class="details-heading">Posting Details</span>
     <button
       type="button"
       class="btn-subtle btn-small"
@@ -10,6 +10,31 @@
       ✕ Close
     </button>
   </div>
+  <form
+    class="job-company-form"
+    action="/job/{{ job.id }}/company"
+    method="post"
+    hx-post="/job/{{ job.id }}/company"
+    hx-target="#job-details-{{ job.id }}"
+    hx-swap="innerHTML"
+  >
+    <label for="company-name-{{ job.id }}">Company</label>
+    <div class="job-company-form-row">
+      <input
+        id="company-name-{{ job.id }}"
+        type="text"
+        name="company"
+        value="{{ job.company if job.company_id else '' }}"
+        placeholder="Enter the employer name"
+        maxlength="200"
+        required
+      >
+      <button type="submit" class="btn-primary btn-small">Save company</button>
+    </div>
+    {% if company_error %}
+    <p class="company-form-error" role="alert">{{ company_error }}</p>
+    {% endif %}
+  </form>
   <div class="job-description-content markdown-body">
     {% if job.description %} {{ job.description | render_markdown | safe }} {% else %}
     <em class="no-description">No description available for this posting.</em>

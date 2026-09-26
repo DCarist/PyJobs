@@ -570,7 +570,7 @@ wheels = [
 
 [[package]]
 name = "pyjobs"
-version = "0.2.1"
+version = "0.2.2"
 source = { editable = "." }
 dependencies = [
     { name = "docx2pdf" },

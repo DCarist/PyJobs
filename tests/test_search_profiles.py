@@ -61,6 +61,54 @@ def test_create_and_update_search_profile(client, db_session):
     assert profile.refresh_interval_hours == 12
 
 
+def test_ten_mile_profile_round_trip_and_scrape(client, db_session):
+    response = client.post(
+        "/profiles",
+        data={
+            "name": "Nearby",
+            "positions": "Engineer",
+            "location": "Allentown, PA",
+            "distance_miles": 10,
+        },
+    )
+    assert response.status_code == 200
+    profile = db_session.query(SearchProfile).filter_by(name="Nearby").one()
+    assert profile.distance_miles == 10
+    sidebar = client.get(f"/?profile_id={profile.id}")
+    assert '<option value="10" selected>10 miles</option>' in sidebar.text
+
+    response = client.post(
+        f"/profiles/{profile.id}",
+        data={
+            "name": "Nearby",
+            "positions": "Engineer",
+            "location": "Allentown, PA",
+            "distance_miles": 10,
+        },
+    )
+    assert response.status_code == 200
+    db_session.refresh(profile)
+    assert profile.distance_miles == 10
+
+    from pyjobs.services.task_manager import create_task
+
+    task = create_task(profile.name, profile.id)
+    with patch(
+        "pyjobs.services.task_manager.fetch_jobs",
+        return_value=[
+            {
+                "job_id": "nearby-1",
+                "title": "Engineer",
+                "company": "Nearby Co",
+                "location": "Allentown, PA",
+            }
+        ],
+    ) as fetch:
+        run_scrape_task_sync(task.task_id, profile.id, client.app.state.session_factory)
+    assert fetch.call_args.kwargs["distance_miles"] == 10
+    assert db_session.query(SavedJob).filter_by(job_id="nearby-1").one().company == "Nearby Co"
+
+
 def test_delete_search_profile(client, db_session):
     p1 = SearchProfile(name="Profile 1", positions="Dev")
     p2 = SearchProfile(name="Profile 2", positions="QA")

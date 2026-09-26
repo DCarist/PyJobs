@@ -21,6 +21,7 @@ from pyjobs.models import (
     JobApplication,
     Resume,
 )
+from pyjobs.services.companies import get_or_create_company_site
 
 router = APIRouter()
 
@@ -192,10 +193,13 @@ async def create_manual_application(
         elif status == "saved":
             parsed_follow_up_date = today + datetime.timedelta(days=7)
 
+    company_record, _ = get_or_create_company_site(db, company, location)
+    db.flush()
     app_record = JobApplication(
         company=company.strip(),
         title=title.strip(),
         location=location.strip(),
+        company_id=company_record.id if company_record else None,
         salary_stated=salary_stated.strip() or None,
         method=method.strip(),
         status=status.strip(),
@@ -564,6 +568,9 @@ async def update_application_job_info(
     app_record.company = company.strip()
     app_record.title = title.strip()
     app_record.location = location.strip()
+    company_record, _ = get_or_create_company_site(db, app_record.company, app_record.location)
+    db.flush()
+    app_record.company_id = company_record.id if company_record else None
     app_record.salary_stated = salary_stated.strip() or None
     app_record.job_url = job_url.strip() or None
 
@@ -571,6 +578,7 @@ async def update_application_job_info(
         app_record.saved_job.company = app_record.company
         app_record.saved_job.title = app_record.title
         app_record.saved_job.location = app_record.location
+        app_record.saved_job.company_id = app_record.company_id
         if app_record.job_url:
             app_record.saved_job.job_url = app_record.job_url
         if app_record.salary_stated:

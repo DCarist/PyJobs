@@ -10,8 +10,11 @@ from sqlalchemy.orm import Session
 
 from pyjobs.database import SessionLocal
 from pyjobs.dependencies import (
+    CurationFilters,
+    get_curation_filters,
     get_db,
     get_tracked_applications_map,
+    group_jobs,
     query_filtered_jobs,
     templates,
 )
@@ -20,24 +23,20 @@ from pyjobs.models import (
     SearchProfile,
     UserPreference,
 )
+from pyjobs.services.companies import (
+    company_name_from_scrape,
+    get_or_create_company_site,
+    normalize_company_name,
+)
 from pyjobs.services.scraper import fetch_jobs
 from pyjobs.services.task_manager import get_task, launch_scrape_task
 
 router = APIRouter()
 
 
-@router.get("/", response_class=HTMLResponse)
-async def index(
-    request: Request,
-    exclude_tracked: bool | None = None,
-    db: Session = Depends(get_db),
-):
-    if exclude_tracked is None:
-        cookie_val = request.cookies.get("pyjobs_exclude_tracked")
-        is_exclude_tracked = (cookie_val or "").lower() in ("true", "1")
-    else:
-        is_exclude_tracked = exclude_tracked
-
+def render_index(request: Request, db: Session, filters: CurationFilters):
+    """Render the full curation page using the same filters as partials and exports."""
+    is_exclude_tracked = filters.exclude_tracked
     profiles = db.query(SearchProfile).order_by(SearchProfile.id.asc()).all()
     if not profiles:
         pref = db.query(UserPreference).first()
@@ -60,18 +59,19 @@ async def index(
 
     active_profile = profiles[0]
 
-    # Immediately load existing saved jobs on launch applying active filters
-    jobs = query_filtered_jobs(db, exclude_tracked=is_exclude_tracked)
+    jobs = filters.jobs(db)
     tracked_map = get_tracked_applications_map(db)
     response = templates.TemplateResponse(
         request=request,
         name="index.html",
         context={
+            "filters": filters,
             "profiles": profiles,
             "active_profile": active_profile,
             "jobs": jobs,
             "total_jobs_count": len(jobs),
-            "group_by": "none",
+            "group_by": filters.group_by,
+            "grouped_jobs": group_jobs(jobs, filters.group_by),
             "active_page": "curation",
             "tracked_map": tracked_map,
             "exclude_tracked": is_exclude_tracked,
@@ -85,6 +85,15 @@ async def index(
         path="/",
     )
     return response
+
+
+@router.get("/", response_class=HTMLResponse)
+async def index(
+    request: Request,
+    filters: CurationFilters = Depends(get_curation_filters),
+    db: Session = Depends(get_db),
+):
+    return render_index(request, db, filters)
 
 
 @router.post("/scrape/start", response_class=HTMLResponse)
@@ -206,6 +215,19 @@ async def search_jobs(request: Request, db: Session = Depends(get_db)):
             continue
 
         existing_job = db.query(SavedJob).filter(SavedJob.job_id == j["job_id"]).first()
+        scraped_company = company_name_from_scrape(j.get("company"), j.get("description"))
+        observed_company = (
+            normalize_company_name(existing_job.company) if existing_job else None
+        ) or scraped_company
+        observed_location = j.get("location") or (existing_job.location if existing_job else "")
+        try:
+            company_record, _ = get_or_create_company_site(
+                db, observed_company or "", observed_location
+            )
+            db.flush()
+        except IntegrityError:
+            db.rollback()
+            continue
         if not existing_job:
             date_posted = j.get("date_posted")
             if isinstance(date_posted, str):
@@ -218,8 +240,9 @@ async def search_jobs(request: Request, db: Session = Depends(get_db)):
                 job_id=str(j["job_id"]),
                 site=j.get("site", ""),
                 title=j.get("title", ""),
-                company=j.get("company", ""),
+                company=observed_company or "",
                 location=j.get("location", ""),
+                company_id=company_record.id if company_record else None,
                 salary_source=j.get("salary_source"),
                 min_salary=j.get("min_salary"),
                 max_salary=j.get("max_salary"),
@@ -233,6 +256,10 @@ async def search_jobs(request: Request, db: Session = Depends(get_db)):
             )
             db.add(new_job)
         else:
+            existing_job.company_id = company_record.id if company_record else None
+            existing_job.company = observed_company or ""
+            if j.get("location"):
+                existing_job.location = j["location"]
             # Refresh classification and salary metadata on existing job
             if j.get("seniority_level"):
                 existing_job.seniority_level = j["seniority_level"]

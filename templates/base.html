@@ -10,7 +10,7 @@
       rel="stylesheet"
     >
     <!-- CSS -->
-    <link rel="stylesheet" href="/static/styles.css?v=3">
+    <link rel="stylesheet" href="/static/styles.css?v=0.2.2-tracker-company">
     <!-- HTMX -->
     <script
       src="https://unpkg.com/htmx.org@1.9.10"
@@ -42,6 +42,9 @@
           >
             <span>📋 Application Tracker</span>
           </a>
+          <a href="/companies" class="nav-tab {% if active_page == 'companies' %}active{% endif %}">
+            <span>Companies</span>
+          </a>
           <a
             href="/applications/unemployment-report"
             class="nav-tab {% if active_page == 'unemployment' %}active{% endif %}"
@@ -55,6 +58,6 @@
       </header>
       <main>{% block content %}{% endblock %}</main>
     </div>
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=0.2.2-company-cards"></script>
   </body>
 </html>

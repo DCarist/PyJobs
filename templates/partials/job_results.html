@@ -14,7 +14,7 @@
       <div class="job-header">
         <div>
           <h3 class="job-title">{{ job.title }}</h3>
-          <p class="job-company">{{ job.company }}</p>
+          {% include "partials/job_company.html" %}
         </div>
         <div class="badges-top">
           <span class="badge seniority-badge">{{ job.seniority_level }}</span>
@@ -70,7 +70,7 @@
   <div class="job-header">
     <div>
       <h3 class="job-title">{{ job.title }}</h3>
-      <p class="job-company">{{ job.company }}</p>
+      {% include "partials/job_company.html" %}
     </div>
     <div class="badges-top">
       <span class="badge seniority-badge">{{ job.seniority_level }}</span>

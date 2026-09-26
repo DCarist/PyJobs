@@ -30,6 +30,8 @@ uv tool install ty
 **Option 1: One-Click Local Launcher (This Machine Only)**
 Double-click `run.bat` in the project root. It will start the server on `127.0.0.1:8000` and automatically open PyJobs in your default web browser.
 
+On a clean `main` checkout, `run.bat` checks `origin/main` before launching. If a newer commit can be fast-forwarded, it asks before updating and relaunches automatically; declining or an unavailable network starts the installed version. Development branches (including `dev`), local changes, and diverged `main` are never updated by the launcher. This checks commits on the main branch, not GitHub release tags; `run_network.bat` and CLI launches do not check.
+
 **Option 2: One-Click Local Network Launcher (Other Devices on LAN)**
 Double-click `run_network.bat` in the project root. It binds to `0.0.0.0:8000`, automatically detects your machine's primary Wi-Fi/Ethernet LAN IP, and displays the direct access link:
 ```text
@@ -75,11 +77,13 @@ The application is structured into a modular Python package:
   * `profiles`: Search profiles management and drawer partials.
   * `applications`: Applications pipeline, Kanban/Table views, detail center, contacts, activities, and unemployment reports.
   * `resumes`: Resumes dashboard, versions management, PDF viewer, and templated downloads.
+  * `companies`: Company directory, work-site address editing, and optional driving directions.
 * **`pyjobs.services`**: Background workers and parsing engines:
   * `scraper`: JobSpy scraping engine, location parsing, and salary/seniority classification.
   * `scheduler`: In-app asyncio recurring search scheduler.
   * `task_manager`: Background scrape task runner and SSE event streaming.
   * `resume_parser`: PDF/DOCX text extraction, Word compilation, scoring, and dynamic filename generation.
+  * `companies` / `locations`: Company/site deduplication, historical backfill, and US city/state grouping.
 * **`pyjobs.database` & `pyjobs.models`**: DeclarativeBase, SessionLocal, and SQLAlchemy 2.0 models.
 * **`pyjobs.dependencies`**: Dependency injection (`get_db`, `templates`), upload path resolvers, and query helpers.
 * **`pyjobs.launcher`**: CLI argument parser, LAN IP detection, browser spawning, and server launcher.
@@ -118,6 +122,7 @@ set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
   * Profile Name, Position Titles, and Required Skills/Fields.
   * Geographic Location, Search Radius (miles), and Remote Toggle.
   * Target Job Boards (`linkedin`, `indeed`, `google`, `zip_recruiter`, `glassdoor`).
+  * **10-mile radius** is available alongside 15/25/50/100 miles. Radius is passed to JobSpy, not applied as a second distance filter.
   * Desired Result Count & Max Posting Age (days).
 * **Sidebar Profile Switcher**: Switch active profiles seamlessly or create new profiles directly in the dashboard sidebar.
 * **Feed Filtering by Profile**: Filter the main jobs feed to inspect opportunities discovered by specific profiles or view all aggregated jobs.
@@ -143,6 +148,22 @@ set JOBSPY_PROXIES=http://user:pass@proxy1:port,http://user:pass@proxy2:port
 * **1-Click Bulk Auto-Hide**: Hide all stale postings with a single click to keep your active pipeline clean.
 * **Active vs. Stale Filtering**: Main feed filters allow viewing `All Postings`, `Active Only`, or `Stale Only`.
 * **Hide Tracked Postings**: Instant toggle (`Hide tracked jobs`) filters out postings that are already being tracked in your pipeline (saved, applied, interviewing, cancelled, or URL-matched), with automatic cookie and localStorage state persistence across navigation.
+
+### Curated Feed Filters & Grouping
+* Seniority, salary bracket, source board, and discovery profile support multiple selections within each filter. Selected values match any option within that filter; filters combine across categories. An empty selection means all.
+* The multi-select filters open styled checkbox menus matching the other dropdown controls.
+* Salary brackets can include unspecified postings with the separate toggle; explicitly selecting Unspecified remains effective when that toggle is off.
+* Filter selections, sorting, and grouping live in the URL. Reloading a filtered URL restores the controls and server-rendered results; CSV, Excel, and JSON exports use the same filters and posting order.
+* Location grouping merges equivalent US city/state labels (for example, `Allentown, PA` and `Allentown, PA, US`). Group headings stay alphabetical; Sort By orders postings within each group.
+
+### Company Profiles & Directions (`/companies`)
+* Company profiles are built from saved postings and tracked applications, merging case-insensitive company names and observed physical work sites. Remote-only employers have no physical sites until one is entered.
+* Job cards and tracked-application details show the same office-icon company pill linked to its profile when identified. If the scraper cannot identify an employer, use **Set company** on the card or the Company field in Posting Details; corrections update linked tracked applications and refresh the filtered feed.
+* Scraped placeholder values such as `none` do not create company profiles. When the scraped name is missing, only explicit `Company:` or `Employer:` lines in the description are used; otherwise the posting stays unidentified for manual correction. A saved company name is retained across later scrapes.
+* Edit or add a site's street address on its profile. Observed city labels do not supply an assumed street address, and removing a posting does not remove its historical work site.
+* Save a separate home starting location on the Companies page. This does not change your search-profile target or the legacy search preference. Driving-directions links open Google Maps only when clicked; city-only destinations are marked **Approximate (city center)**. No Maps API key or geocoding is needed.
+* Company directory cards link to each profile. Profiles show related postings with the regular feed cards and tracked applications with the tracker cards (without drag-and-drop outside the tracker). Sites show a **Set home location** action when directions have no starting point.
+* Directory cards count unhidden postings and applications in active pipeline stages (`saved`, `applied`, `screening`, `interviewing`, `offer`). Rejected, withdrawn, and cancelled applications do not count as active. **Hide companies with no available postings or active applications** filters only the directory; it is off by default and retained in the URL on reload. Company profiles still show historical records.
 
 ---
 

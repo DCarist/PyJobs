@@ -1,0 +1,41 @@
+<div
+  class="kanban-card glass-panel"
+  id="app-card-{{ app.id }}"
+  draggable="{{ 'false' if company_profile_view else 'true' }}"
+  data-app-id="{{ app.id }}"
+  data-current-stage="{{ col.id if not company_profile_view else '' }}"
+>
+  <div class="kanban-card-top">
+    <a href="/applications/{{ app.id }}" class="kanban-card-title">
+      {{ app.title or "Untitled Role" }}
+    </a>
+    <span class="kanban-company">{{ app.company }}</span>
+  </div>
+
+  <div class="kanban-card-meta">
+    {% if company_profile_view or col.id == 'closed' %}
+    <span class="badge stage-badge stage-{{ app.status }}">● {{ app.status|capitalize }}</span>
+    {% endif %} {% if app.location %}
+    <span class="badge meta-badge">📍 {{ app.location }}</span>
+    {% endif %} {% if app.salary_stated %}
+    <span class="badge meta-badge salary-badge">💰 {{ app.salary_stated }}</span>
+    {% endif %} {% if app.method %}
+    <span class="badge meta-badge method-badge">🌐 {{ app.method }}</span>
+    {% endif %} {% if app.account_created %}
+    <span class="badge meta-badge portal-badge" title="Portal account created">🔑 Portal</span>
+    {% endif %}
+  </div>
+
+  {% if app.follow_up_date and app.status not in ['offer', 'rejected', 'withdrawn', 'cancelled'] %}
+  <div
+    class="follow-up-indicator {% if today > app.follow_up_date %}overdue{% elif app.follow_up_date == today %}due-today{% endif %}"
+  >
+    <span class="follow-up-icon">⏰</span>
+    <span class="follow-up-text">
+      {% if today > app.follow_up_date %} Overdue ({{ app.follow_up_date.strftime('%b %d') }}) {%
+      elif app.follow_up_date == today %} Due Today! {% else %} {{ app.follow_up_date.strftime('%b
+      %d') }} {% endif %}
+    </span>
+  </div>
+  {% endif %}
+</div>

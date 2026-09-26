@@ -56,11 +56,20 @@
           ✏️ Edit Info
         </button>
       </div>
-      <h3 class="detail-company">
-        {{ application.company }} {% if application.location %}
-        <span class="detail-location">· 📍 {{ application.location }}</span>
+      <div class="detail-company">
+        {% if application.company_id %}
+        <a class="badge company-badge" href="/companies/{{ application.company_id }}"
+          ><span aria-hidden="true">🏢</span>{{ application.company }}</a
+        >
+        {% else %}
+        <span class="badge company-badge"
+          ><span aria-hidden="true">🏢</span>{{ application.company or "Company not identified"
+          }}</span
+        >
+        {% endif %} {% if application.location %}
+        <span class="detail-location">📍 {{ application.location }}</span>
         {% endif %}
-      </h3>
+      </div>
     </div>
 
     <!-- Interactive Status Pipeline Stepper -->

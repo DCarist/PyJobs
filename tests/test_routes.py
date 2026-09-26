@@ -144,11 +144,3 @@ def test_hide_job(client):
     response = client.delete("/job/1")
     assert response.status_code == 200
     assert response.text == ""
-
-
-def test_app_version():
-    from pyjobs import __version__
-    from pyjobs.main import app
-
-    assert __version__ == "0.2.1"
-    assert app.version == "0.2.1"

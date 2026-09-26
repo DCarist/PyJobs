@@ -13,6 +13,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from pyjobs.models import JobSearchProfile, SavedJob, SearchProfile
+from pyjobs.services.companies import (
+    company_name_from_scrape,
+    get_or_create_company_site,
+    normalize_company_name,
+)
 from pyjobs.services.scraper import evaluate_job_staleness, fetch_jobs
 
 logger = logging.getLogger("pyjobs.task_manager")
@@ -72,6 +77,7 @@ def _ingest_jobs_for_profile(
             continue
 
         existing_job = db.query(SavedJob).filter(SavedJob.job_id == str(job_id)).first()
+        scraped_company = company_name_from_scrape(j.get("company"), j.get("description"))
         if not existing_job:
             date_posted = j.get("date_posted")
             if isinstance(date_posted, str):
@@ -82,13 +88,21 @@ def _ingest_jobs_for_profile(
 
             now_utc = datetime.datetime.now(datetime.UTC)
             is_stale = evaluate_job_staleness(date_posted, now_utc)
-
+            try:
+                company_record, _ = get_or_create_company_site(
+                    db, scraped_company or "", j.get("location") or ""
+                )
+                db.flush()
+            except IntegrityError:
+                db.rollback()
+                continue
             new_job = SavedJob(
                 job_id=str(job_id),
                 site=j.get("site", ""),
                 title=j.get("title", ""),
-                company=j.get("company", ""),
+                company=scraped_company or "",
                 location=j.get("location", ""),
+                company_id=company_record.id if company_record else None,
                 salary_source=j.get("salary_source"),
                 min_salary=j.get("min_salary"),
                 max_salary=j.get("max_salary"),
@@ -117,8 +131,31 @@ def _ingest_jobs_for_profile(
             except IntegrityError:
                 db.rollback()
         else:
-            # Refresh existing job metadata
+            # Preserve a valid stored employer name because it may be a user's correction.
             modified = False
+            company_name = normalize_company_name(existing_job.company) or scraped_company
+            observed_location = j.get("location") or existing_job.location
+            try:
+                company_record, observed_site = get_or_create_company_site(
+                    db, company_name or "", observed_location
+                )
+                site_created = observed_site is not None and observed_site.id is None
+                db.flush()
+            except IntegrityError:
+                db.rollback()
+                continue
+            modified = site_created
+            if existing_job.company_id != (company_record.id if company_record else None):
+                existing_job.company_id = company_record.id if company_record else None
+                modified = True
+            cleaned_company = company_name or ""
+            if existing_job.company != cleaned_company:
+                existing_job.company = cleaned_company
+                modified = True
+            if j.get("location") and existing_job.location != j["location"]:
+                existing_job.location = j["location"]
+                modified = True
+            # Classification changes below share the same transaction.
             if j.get("seniority_level") and existing_job.seniority_level != j["seniority_level"]:
                 existing_job.seniority_level = j["seniority_level"]
                 modified = True
