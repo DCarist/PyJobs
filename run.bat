@@ -6,7 +6,7 @@ cd /d "%~dp0"
 echo ===================================================
 echo               Starting PyJobs Engine
 echo ===================================================
-echo Opening your dashboard in the default browser...
+echo Opening your dashboard in the default browser once ready...
 echo Press Ctrl+C in this window to stop the server.
 echo.
 

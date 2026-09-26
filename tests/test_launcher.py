@@ -1,16 +1,51 @@
 from __future__ import annotations
 
 import os
+import socket
 import sys
 from unittest.mock import MagicMock, patch
 
-from pyjobs.launcher import get_local_ip, launch_browser, main, parse_args
+from pyjobs.launcher import get_local_ip, launch_browser, main, parse_args, wait_for_server
+
+
+def test_wait_for_server_success():
+    # Bind an ephemeral listening socket
+    server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_sock.bind(("127.0.0.1", 0))
+    server_sock.listen(5)
+    port = server_sock.getsockname()[1]
+    try:
+        assert wait_for_server("127.0.0.1", port, timeout=1.0, check_interval=0.01) is True
+        assert wait_for_server("localhost", port, timeout=1.0, check_interval=0.01) is True
+        assert wait_for_server("0.0.0.0", port, timeout=1.0, check_interval=0.01) is True
+    finally:
+        server_sock.close()
+
+
+def test_wait_for_server_timeout():
+    # Attempt connecting to an unused port with minimal timeout
+    assert wait_for_server("127.0.0.1", 59999, timeout=0.02, check_interval=0.01) is False
 
 
 def test_launch_browser_calls_webbrowser():
-    with patch("webbrowser.open") as mock_open:
-        launch_browser("http://127.0.0.1:8000", delay=0.0)
+    with (
+        patch("pyjobs.launcher.wait_for_server", return_value=True) as mock_wait,
+        patch("webbrowser.open") as mock_open,
+    ):
+        launch_browser("http://127.0.0.1:8000", delay=0.0, timeout=5.0)
+        mock_wait.assert_called_once_with("127.0.0.1", 8000, timeout=5.0, check_interval=0.1)
         mock_open.assert_called_once_with("http://127.0.0.1:8000")
+
+
+def test_launch_browser_with_delay():
+    with (
+        patch("time.sleep") as mock_sleep,
+        patch("pyjobs.launcher.wait_for_server", return_value=True),
+        patch("webbrowser.open") as mock_open,
+    ):
+        launch_browser("http://localhost:9000", delay=0.5)
+        mock_sleep.assert_called_once_with(0.5)
+        mock_open.assert_called_once_with("http://localhost:9000")
 
 
 def test_get_local_ip_success():
